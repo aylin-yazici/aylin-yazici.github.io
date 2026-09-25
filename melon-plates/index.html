@@ -174,14 +174,11 @@
   const SFX = {
     appear() { tone({ f0: 150, f1: 210, dur: .06, vol: .07 }); },            // soft low "puff" as the next piece pops in
     lift() { hiss({ dur: .13, vol: .07, type: 'bandpass', f0: 500, f1: 1100, q: .8 }); },   // airy swish
-    // low, round "pop" per slice (cork/bubble style, kept in the low-mid range)
-    place(size) {
-      for (let i = 0; i < size; i++) {
-        const d = i * .06, v = .94 + Math.random() * .12;
-        tone({ f0: 420 * v, f1: 95 * v, dur: .09, vol: .5, attack: .001, delay: d });   // the pop
-        tone({ f0: 210 * v, f1: 70, dur: .12, vol: .25, attack: .002, delay: d });      // body
-        hiss({ dur: .012, vol: .18, type: 'lowpass', f0: 1100, delay: d });            // soft click at the start
-      }
+    // one low, round pop per placement, however many slices land
+    place() {
+      const v = .95 + Math.random() * .1;
+      tone({ f0: 400 * v, f1: 100 * v, dur: .08, vol: .55, attack: .001 });
+      hiss({ dur: .01, vol: .12, type: 'lowpass', f0: 1000 });
     },
     nope() { tone({ f0: 220, f1: 150, dur: .1, type: 'triangle', vol: .14 }); tone({ f0: 200, f1: 140, dur: .12, type: 'triangle', vol: .12, delay: .1 }); },
     splash(combo) {                                     // crunchy, wet watermelon burst
@@ -371,7 +368,7 @@
     const p = f.p;
     for (let k = 0; k < f.piece.size; k++) p.slots[(f.piece.start + k) % 6] = true;
     p.bounce = 1; S.moves++;
-    SFX.place(f.piece.size);
+    SFX.place();
     if (filled(p) === 6) { p.pop = .001; S.combo++; } else S.combo = 0;
     setTimeout(() => { if (!S.won) { S.piece = newPiece(); S.pieceIn = 0; SFX.appear(); } }, 120);
   }
