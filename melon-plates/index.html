@@ -174,14 +174,13 @@
   const SFX = {
     appear() { tone({ f0: 150, f1: 210, dur: .06, vol: .07 }); },            // soft low "puff" as the next piece pops in
     lift() { hiss({ dur: .13, vol: .07, type: 'bandpass', f0: 500, f1: 1100, q: .8 }); },   // airy swish
-    // ASMR placement: each slice lands with a muted ceramic "tock", a soft body thud and a small wet squish
+    // low, round "pop" per slice (cork/bubble style, kept in the low-mid range)
     place(size) {
       for (let i = 0; i < size; i++) {
-        const d = i * .045, v = .92 + Math.random() * .16;
-        hiss({ dur: .028, vol: .16, type: 'bandpass', f0: 950 * v, q: 5, delay: d });      // ceramic tock
-        tone({ f0: 310 * v, f1: 240 * v, dur: .045, vol: .13, delay: d });                // plate body
-        tone({ f0: 105 * v, f1: 62, dur: .11, vol: .38, attack: .003, delay: d });         // soft thud
-        hiss({ dur: .12, vol: .1, type: 'lowpass', f0: 1500 * v, f1: 260, q: 6, delay: d + .008 }); // juicy squish
+        const d = i * .06, v = .94 + Math.random() * .12;
+        tone({ f0: 420 * v, f1: 95 * v, dur: .09, vol: .5, attack: .001, delay: d });   // the pop
+        tone({ f0: 210 * v, f1: 70, dur: .12, vol: .25, attack: .002, delay: d });      // body
+        hiss({ dur: .012, vol: .18, type: 'lowpass', f0: 1100, delay: d });            // soft click at the start
       }
     },
     nope() { tone({ f0: 220, f1: 150, dur: .1, type: 'triangle', vol: .14 }); tone({ f0: 200, f1: 140, dur: .12, type: 'triangle', vol: .12, delay: .1 }); },
