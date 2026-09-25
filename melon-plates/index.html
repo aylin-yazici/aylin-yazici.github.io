@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Melon Plates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --cloth:#E6F0DF; --check:rgba(111,168,104,.26);
+    --ink:#1F3A28; --ink-soft:#4E6B57;
+    --flesh:#EF3E55; --rind:#2E8B3E; --card:#FFFFFF;
+  }
+  html,body{height:100%}
+  body{
+    margin:0; overflow:hidden; color:var(--ink); user-select:none; -webkit-user-select:none;
+    font-family:"Nunito",system-ui,sans-serif;
+    background-color:var(--cloth);
+    background-image:
+      linear-gradient(90deg,var(--check) 50%,transparent 50%),
+      linear-gradient(var(--check) 50%,transparent 50%);
+    background-size:44px 44px;
+  }
+  #stage{position:relative;width:100%;height:100%;display:grid;place-items:center}
+  #frame{position:relative}
+  canvas{display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+  #mute{
+    position:absolute;top:2.2%;right:3%;width:40px;height:40px;border-radius:50%;
+    border:0;background:var(--card);color:var(--ink);cursor:pointer;
+    box-shadow:0 3px 0 rgba(31,58,40,.18);display:grid;place-items:center;
+  }
+  #mute:focus-visible,#again:focus-visible{outline:3px solid var(--rind);outline-offset:3px}
+  #mute svg{width:20px;height:20px}
+  #win{
+    position:absolute;inset:0;display:grid;place-items:center;
+    background:rgba(31,58,40,.42);padding-inline:16px;
+  }
+  #win[hidden]{display:none}
+  #win .card{
+    background:var(--card);border-radius:28px;padding:28px 24px 24px;text-align:center;
+    width:min(300px,100%);box-shadow:0 10px 0 rgba(31,58,40,.2);
+    animation:rise .45s cubic-bezier(.2,1.6,.4,1) both;
+  }
+  #win h2{font-family:"Lilita One",system-ui,sans-serif;font-weight:400;font-size:46px;margin:6px 0 4px;color:var(--flesh);letter-spacing:.5px}
+  #win p{margin:0 0 20px;color:var(--ink-soft);font-size:16px;text-wrap:balance}
+  #again{
+    font-family:"Lilita One",system-ui,sans-serif;font-size:22px;letter-spacing:.5px;
+    border:0;border-radius:18px;padding:14px 34px;cursor:pointer;color:#fff;
+    background:var(--rind);box-shadow:0 5px 0 #1D5E29;
+  }
+  #again:active{transform:translateY(3px);box-shadow:0 2px 0 #1D5E29}
+  @keyframes rise{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+  @media (prefers-reduced-motion: reduce){#win .card{animation:none}}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="frame">
+    <canvas id="game" aria-label="Melon Plates game board. Drag the slice from the cutting board onto a white plate."></canvas>
+    <button id="mute" type="button" aria-label="Mute sound" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path id="waves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+    </button>
+    <div id="win" hidden>
+      <div class="card" role="dialog" aria-labelledby="winTitle">
+        <h2 id="winTitle">Juicy!</h2>
+        <p id="winText">You collected all 36 slices.</p>
+        <button id="again" type="button">Play again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const W = 393, H = 852;               // iPhone 17 logical frame
+  const GOAL = 36;
+  const R = 62;                         // plate radius
+  const TAU = Math.PI * 2, SEG = TAU / 6;
+  const COL = {
+    rind:'#2E8B3E', rindLight:'#A6D96A', pith:'#F4F8D8', flesh:'#EF3E55', fleshLight:'#FF8595',
+    seed:'#2B1A1A', ink:'#1F3A28', inkSoft:'#4E6B57', ok:'#3FB35A', bad:'#E0493E',
+    wood:'#D39A62', woodDark:'#B67A43', woodLight:'#E6B581'
+  };
+  const PLATE_POS = [[106,238],[287,238],[106,402],[287,402],[106,566],[287,566]];
+  const GEN = { x: W/2, y: 738, r: 82 };
+  const HUD = { x: W/2, y: 76, iconX: W/2 - 62 };
+
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const stage = document.getElementById('stage');
+  const winEl = document.getElementById('win');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- state ----------
+  let S;
+  function freshState() {
+    const pre = [[1,1,1,1,0,0],[0,0,0,0,0,0],[1,0,0,0,1,1],[0,0,1,1,0,0],[0,0,0,0,0,0],[0,0,0,0,0,1]];
+    return {
+      plates: PLATE_POS.map((p, i) => ({ x:p[0], y:p[1], slots: pre[i].map(Boolean), bounce:0, pop:0, hover:null })),
+      remaining: GOAL, shown: GOAL, moves: 0,
+      piece: { start:4, size:2 }, pieceIn: 0,
+      taught: false, won: false,
+    };
+  }
+  let drag = null, ret = null, particles = [], flyers = [], hudBump = 0, t = 0, idle = 0;
+
+  const fits = (p, pc) => { for (let k = 0; k < pc.size; k++) if (p.slots[(pc.start + k) % 6]) return false; return true; };
+  const filled = p => p.slots.filter(Boolean).length;
+
+  function newPiece() {
+    const opts = [];
+    for (let size = 1; size <= 3; size++) for (let start = 0; start < 6; start++) {
+      const pc = { start, size };
+      const hits = S.plates.filter(p => !p.pop && fits(p, pc));
+      if (!hits.length) continue;
+      let w = [0, 2, 3, 3][size];
+      if (hits.some(p => filled(p) + size === 6)) w *= 2.5;   // reward finishing plates
+      opts.push({ pc, w });
+    }
+    if (!opts.length) return { start: 0, size: 1 };
+    let r = Math.random() * opts.reduce((a, o) => a + o.w, 0);
+    for (const o of opts) { if ((r -= o.w) <= 0) return o.pc; }
+    return opts[opts.length - 1].pc;
+  }
+
+  // ---------- audio ----------
+  let AC = null, muted = false;
+  function audio() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (AC && AC.state === 'suspended') AC.resume();
+    return muted ? null : AC;
+  }
+  function tone(f0, f1, dur, type = 'sine', vol = .18, delay = 0) {
+    const a = audio(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain(), n = a.currentTime + delay;
+    o.type = type; o.frequency.setValueAtTime(f0, n); o.frequency.exponentialRampToValueAtTime(f1, n + dur);
+    g.gain.setValueAtTime(vol, n); g.gain.exponentialRampToValueAtTime(.001, n + dur);
+    o.connect(g).connect(a.destination); o.start(n); o.stop(n + dur + .02);
+  }
+  function splat() {
+    const a = audio(); if (!a) return;
+    const len = a.sampleRate * .35, b = a.createBuffer(1, len, a.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    s.buffer = b; f.type = 'lowpass'; f.frequency.value = 1400; g.gain.value = .5;
+    s.connect(f).connect(g).connect(a.destination); s.start();
+    tone(180, 60, .25, 'sine', .35);
+  }
+  document.getElementById('mute').addEventListener('click', e => {
+    muted = !muted;
+    e.currentTarget.setAttribute('aria-pressed', muted);
+    e.currentTarget.setAttribute('aria-label', muted ? 'Unmute sound' : 'Mute sound');
+    document.getElementById('waves').style.opacity = muted ? .15 : 1;
+  });
+
+  // ---------- sizing ----------
+  let scale = 1, dpr = 1;
+  function resize() {
+    scale = Math.min(stage.clientWidth / W, stage.clientHeight / H);
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    cv.style.width = W * scale + 'px'; cv.style.height = H * scale + 'px';
+    cv.width = Math.round(W * scale * dpr); cv.height = Math.round(H * scale * dpr);
+  }
+  addEventListener('resize', resize);
+
+  // ---------- drawing ----------
+  function sector(cx, cy, r, a0, a1, fill) {
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, a0, a1); ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+  }
+  // one watermelon wedge in slot i of a melon centred at cx,cy
+  function drawSlice(cx, cy, r, i, alpha = 1) {
+    const a0 = -Math.PI / 2 + i * SEG, a1 = a0 + SEG, mid = a0 + SEG / 2;
+    const g = r * .035;
+    const x = cx + Math.cos(mid) * g, y = cy + Math.sin(mid) * g;
+    ctx.save(); ctx.globalAlpha *= alpha;
+    sector(x, y, r, a0, a1, COL.rind);
+    sector(x, y, r * .9, a0, a1, COL.rindLight);
+    sector(x, y, r * .84, a0, a1, COL.pith);
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, r * .8);
+    gr.addColorStop(0, COL.fleshLight); gr.addColorStop(.75, COL.flesh); gr.addColorStop(1, '#E02E48');
+    sector(x, y, r * .8, a0, a1, gr);
+    for (const [rr, da] of [[.46, -.13], [.64, .12], [.3, .05]]) {
+      const sa = mid + da, sx = x + Math.cos(sa) * r * rr, sy = y + Math.sin(sa) * r * rr;
+      ctx.save(); ctx.translate(sx, sy); ctx.rotate(sa);
+      ctx.beginPath(); ctx.ellipse(0, 0, r * .07, r * .04, 0, 0, TAU); ctx.fillStyle = COL.seed; ctx.fill();
+      ctx.beginPath(); ctx.ellipse(r * .02, -r * .012, r * .02, r * .01, 0, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  function drawPiece(pc, cx, cy, r, alpha = 1) {
+    for (let k = 0; k < pc.size; k++) drawSlice(cx, cy, r, (pc.start + k) % 6, alpha);
+  }
+  function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+  function drawPlate(p) {
+    const s = 1 + p.bounce * .07 + p.pop * .12;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.scale(s, s);
+    ctx.beginPath(); ctx.ellipse(0, 9, R + 10, R + 6, 0, 0, TAU); ctx.fillStyle = 'rgba(31,58,40,.16)'; ctx.fill();
+    const rim = ctx.createLinearGradient(0, -R, 0, R);
+    rim.addColorStop(0, '#FFFFFF'); rim.addColorStop(1, '#DCE6DE');
+    ctx.beginPath(); ctx.arc(0, 0, R + 10, 0, TAU); ctx.fillStyle = rim; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, R + 1, 0, TAU); ctx.fillStyle = '#F3F7F3'; ctx.fill();
+    ctx.strokeStyle = '#E1E9E2'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = '#E4ECE5'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 5]);
+    for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + i * SEG; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R); ctx.stroke(); }
+    ctx.setLineDash([]);
+    if (p.hover) {
+      ctx.beginPath(); ctx.arc(0, 0, R + 10, 0, TAU);
+      ctx.strokeStyle = p.hover === 'ok' ? COL.ok : COL.bad; ctx.lineWidth = 4; ctx.stroke();
+    }
+    p.slots.forEach((on, i) => { if (on) drawSlice(0, 0, R, i); });
+    if (p.hover === 'ok' && drag) drawPiece(drag.piece, 0, 0, R, .4);
+    ctx.restore();
+  }
+
+  function drawBoard() {
+    const { x, y, r } = GEN;
+    ctx.beginPath(); ctx.ellipse(x, y + 10, r + 4, r - 2, 0, 0, TAU); ctx.fillStyle = 'rgba(31,58,40,.2)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = COL.woodDark; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y - 4, r - 2, 0, TAU); ctx.fillStyle = COL.wood; ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.arc(x, y - 4, r - 2, 0, TAU); ctx.clip();
+    ctx.strokeStyle = COL.woodLight; ctx.lineWidth = 2; ctx.globalAlpha = .55;
+    for (let i = -4; i <= 4; i++) { ctx.beginPath(); ctx.ellipse(x + 8, y - 4 + i * 4, r * 1.2, 14 + i * i * 3, 0, 0, TAU); ctx.stroke(); }
+    ctx.restore();
+    // "next" tag
+    const tw = 74; rrect(x - tw / 2, y - r - 16, tw, 26, 13); ctx.fillStyle = COL.ink; ctx.fill();
+    ctx.font = '15px "Lilita One", system-ui, sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('NEXT', x, y - r - 2.5);
+  }
+
+  function drawMelonIcon(x, y, r) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = COL.rind; ctx.fill();
+    for (let i = 0; i < 6; i++) drawSlice(x, y, r, i);
+  }
+
+  function drawHud() {
+    const s = 1 + hudBump * .12;
+    const w = 232, h = 76, x = HUD.x - w / 2, y = HUD.y - h / 2;
+    rrect(x, y + 5, w, h, 26); ctx.fillStyle = 'rgba(31,58,40,.16)'; ctx.fill();
+    rrect(x, y, w, h, 26); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.save(); ctx.translate(HUD.iconX, HUD.y); ctx.scale(s, s); drawMelonIcon(0, 0, 25); ctx.restore();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.save(); ctx.translate(HUD.iconX + 40, HUD.y + 4); ctx.scale(s, s);
+    ctx.font = '40px "Lilita One", system-ui, sans-serif'; ctx.fillStyle = COL.ink; ctx.fillText(String(S.shown), 0, 0);
+    ctx.restore();
+    ctx.font = '800 12px "Nunito", system-ui, sans-serif'; ctx.fillStyle = COL.inkSoft;
+    ctx.fillText('SLICES LEFT', HUD.iconX + 42, HUD.y + 22);
+    // progress
+    const pw = 200, px = HUD.x - pw / 2, py = HUD.y + 50;
+    rrect(px, py, pw, 10, 5); ctx.fillStyle = 'rgba(31,58,40,.14)'; ctx.fill();
+    const f = 1 - S.shown / GOAL;
+    if (f > 0) { rrect(px, py, Math.max(10, pw * f), 10, 5); ctx.fillStyle = COL.flesh; ctx.fill(); }
+  }
+
+  function drawHand(x, y, press) {
+    ctx.save(); ctx.translate(x, y);
+    if (press) { ctx.beginPath(); ctx.arc(0, 0, 22 + press * 10, 0, TAU); ctx.strokeStyle = `rgba(255,255,255,${.8 - press * .6})`; ctx.lineWidth = 3; ctx.stroke(); }
+    ctx.rotate(-.35);
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = COL.ink; ctx.lineWidth = 3;
+    rrect(-9, -4, 18, 44, 9); ctx.fill(); ctx.stroke();
+    rrect(-16, 22, 40, 38, 14); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- effects ----------
+  function explode(p) {
+    splat();
+    const n = reduceMotion ? 10 : 34;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, v = 120 + Math.random() * 320;
+      particles.push({ kind: Math.random() < .25 ? 'seed' : 'drop', x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120,
+        r: 3 + Math.random() * 6, life: .9 + Math.random() * .5, age: 0, rot: a });
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = -Math.PI / 2 + i * SEG + SEG / 2, v = 160 + Math.random() * 80;
+      particles.push({ kind: 'chunk', i, x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, r: R, life: .55, age: 0, rot: 0, vr: (Math.random() - .5) * 8 });
+    }
+    particles.push({ kind: 'ring', x: p.x, y: p.y, life: .45, age: 0 });
+    particles.push({ kind: 'text', x: p.x, y: p.y - 10, life: 1.1, age: 0 });
+    for (let i = 0; i < 6; i++) flyers.push({ i, x0: p.x, y0: p.y, t: -.25 - i * .09, dur: .55 });
+  }
+
+  // ---------- input ----------
+  function toGame(e) {
+    const b = cv.getBoundingClientRect();
+    return { x: (e.clientX - b.left) / b.width * W, y: (e.clientY - b.top) / b.height * H };
+  }
+  cv.addEventListener('pointerdown', e => {
+    if (S.won || !S.piece || S.pieceIn < .6) return;
+    const m = toGame(e);
+    if (Math.hypot(m.x - GEN.x, m.y - GEN.y) > GEN.r + 16) return;
+    audio();
+    cv.setPointerCapture(e.pointerId);
+    const lift = e.pointerType === 'mouse' ? 0 : -70;
+    drag = { piece: S.piece, pid: e.pointerId, ox: GEN.x - m.x, oy: GEN.y - m.y + lift, x: GEN.x, y: GEN.y + lift / 2 };
+    ret = null; S.taught = true; idle = 0;
+    tone(420, 620, .07, 'triangle', .12);
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const m = toGame(e); drag.x = m.x + drag.ox; drag.y = m.y + drag.oy;
+    const tgt = target();
+    S.plates.forEach(p => p.hover = p === tgt ? (fits(p, drag.piece) ? 'ok' : 'bad') : null);
+  });
+  function target() {
+    let best = null, bd = R * 1.25;
+    for (const p of S.plates) { const d = Math.hypot(p.x - drag.x, p.y - drag.y); if (d < bd && !p.pop) { bd = d; best = p; } }
+    return best;
+  }
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.pid) return;
+    const p = target();
+    S.plates.forEach(q => q.hover = null);
+    if (p && fits(p, drag.piece)) {
+      for (let k = 0; k < drag.piece.size; k++) p.slots[(drag.piece.start + k) % 6] = true;
+      p.bounce = 1; S.moves++;
+      tone(300, 180, .09, 'sine', .25);
+      if (filled(p) === 6) setTimeout(() => { p.pop = .001; }, 140);
+      S.piece = null; S.pieceIn = 0;
+      setTimeout(() => { if (!S.won) { S.piece = newPiece(); S.pieceIn = 0; } }, 260);
+    } else {
+      ret = { x: drag.x, y: drag.y, t: 0 };
+      if (p) tone(200, 140, .12, 'square', .06);
+    }
+    drag = null;
+  }
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+
+  document.getElementById('again').addEventListener('click', () => { start({}); });
+
+  // ---------- loop ----------
+  function update(dt) {
+    t += dt; if (!drag) idle += dt;
+    hudBump = Math.max(0, hudBump - dt * 4);
+    if (S.piece) S.pieceIn = Math.min(1, S.pieceIn + dt * 4);
+    if (ret) { ret.t += dt * 6; if (ret.t >= 1) ret = null; }
+    for (const p of S.plates) {
+      p.bounce = Math.max(0, p.bounce - dt * 5);
+      if (p.pop > 0) {
+        p.pop += dt * 6;
+        if (p.pop >= 1) { p.pop = 0; explode(p); p.slots = p.slots.map(() => false); }
+      }
+    }
+    for (const q of particles) {
+      q.age += dt;
+      if (q.vx !== undefined) { q.vy += 900 * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.vr) q.rot += q.vr * dt; }
+    }
+    particles = particles.filter(q => q.age < q.life);
+    for (const f of flyers) {
+      f.t += dt / f.dur;
+      if (f.t >= 1 && !f.done) {
+        f.done = true;
+        S.shown = Math.max(0, S.shown - 1); S.remaining = S.shown; hudBump = 1;
+        tone(700 + (GOAL - S.shown) % 12 * 40, 1100 + (GOAL - S.shown) % 12 * 40, .08, 'triangle', .1);
+      }
+    }
+    flyers = flyers.filter(f => !f.done);
+    if (!S.won && S.shown === 0 && !flyers.length) {
+      S.won = true;
+      setTimeout(() => {
+        document.getElementById('winText').textContent = `You collected all ${GOAL} slices in ${S.moves} moves.`;
+        winEl.hidden = false; document.getElementById('again').focus();
+        tone(523, 523, .15, 'triangle', .15); tone(659, 659, .15, 'triangle', .15, .12); tone(784, 1046, .3, 'triangle', .15, .24);
+      }, 450);
+    }
+  }
+
+  const ease = x => 1 - Math.pow(1 - x, 3);
+  const back = x => 1 + 2.7 * Math.pow(x - 1, 3) + 1.7 * Math.pow(x - 1, 2);
+
+  function render() {
+    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawHud();
+    S.plates.forEach(drawPlate);
+    drawBoard();
+
+    // piece on the board
+    if (S.piece && !drag) {
+      let x = GEN.x, y = GEN.y - 4, s = back(S.pieceIn);
+      if (ret) { const k = ease(ret.t); x = ret.x + (GEN.x - ret.x) * k; y = ret.y + (GEN.y - 4 - ret.y) * k; }
+      ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+      ctx.shadowColor = 'rgba(31,58,40,.25)'; ctx.shadowOffsetY = 4; ctx.shadowBlur = 6;
+      drawPiece(S.piece, 0, 0, R * .92);
+      ctx.restore();
+    }
+
+    for (const q of particles) {
+      const k = q.age / q.life;
+      if (q.kind === 'drop') { ctx.globalAlpha = 1 - k; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (1 - k * .4), 0, TAU); ctx.fillStyle = COL.flesh; ctx.fill(); }
+      else if (q.kind === 'seed') { ctx.globalAlpha = 1 - k; ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot + q.age * 6); ctx.beginPath(); ctx.ellipse(0, 0, 5, 3, 0, 0, TAU); ctx.fillStyle = COL.seed; ctx.fill(); ctx.restore(); }
+      else if (q.kind === 'chunk') { ctx.globalAlpha = 1 - k; ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.scale(1 - k * .5, 1 - k * .5); drawSlice(0, 0, q.r, q.i); ctx.restore(); }
+      else if (q.kind === 'ring') { ctx.globalAlpha = (1 - k) * .8; ctx.beginPath(); ctx.arc(q.x, q.y, R + 10 + ease(k) * 60, 0, TAU); ctx.strokeStyle = '#fff'; ctx.lineWidth = 8 * (1 - k); ctx.stroke(); }
+      else if (q.kind === 'text') {
+        ctx.globalAlpha = k < .7 ? 1 : 1 - (k - .7) / .3;
+        const s = back(Math.min(1, k * 4));
+        ctx.save(); ctx.translate(q.x, q.y - ease(k) * 50); ctx.scale(s, s);
+        ctx.font = '52px "Lilita One", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 8; ctx.strokeStyle = COL.ink; ctx.strokeText('+6', 0, 0);
+        ctx.fillStyle = '#FFE14D'; ctx.fillText('+6', 0, 0);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    for (const f of flyers) {
+      if (f.t < 0) continue;
+      const k = ease(f.t), cx = (f.x0 + HUD.iconX) / 2 + (f.i - 2.5) * 30, cy = Math.min(f.y0, HUD.y) - 60;
+      const x = (1 - k) * (1 - k) * f.x0 + 2 * (1 - k) * k * cx + k * k * HUD.iconX;
+      const y = (1 - k) * (1 - k) * f.y0 + 2 * (1 - k) * k * cy + k * k * HUD.y;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(k * 4); drawSlice(0, 0, 30 * (1 - k * .4), f.i); ctx.restore();
+    }
+
+    if (drag) {
+      ctx.save(); ctx.translate(drag.x, drag.y); ctx.scale(1.04, 1.04);
+      ctx.shadowColor = 'rgba(31,58,40,.3)'; ctx.shadowOffsetY = 12; ctx.shadowBlur = 14;
+      drawPiece(drag.piece, 0, 0, R);
+      ctx.restore();
+    }
+
+    // tutorial hand until the first drag
+    if (!S.taught && S.piece && S.pieceIn >= 1 && idle > .6) {
+      const tgt = S.plates.find(p => fits(p, S.piece) && filled(p) + S.piece.size === 6) || S.plates.find(p => fits(p, S.piece));
+      if (tgt) {
+        const c = ((t - .6) % 2.2) / 2.2;
+        let x = GEN.x, y = GEN.y, press = 0;
+        if (c < .15) press = c / .15;
+        else if (c < .7) { const k = ease((c - .15) / .55); x += (tgt.x - GEN.x) * k; y += (tgt.y - GEN.y) * k; ctx.save(); ctx.globalAlpha = .55; drawPiece(S.piece, x, y, R); ctx.restore(); }
+        else { x = tgt.x; y = tgt.y; }
+        drawHand(x + 14, y + 16, press);
+      }
+    }
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    update(dt); render(); requestAnimationFrame(frame);
+  }
+
+  function start(data) {
+    S = data && data.S ? data.S : freshState();
+    particles = []; flyers = []; drag = null; ret = null; idle = 0;
+    winEl.hidden = !S.won;
+  }
+  window.claude?.hot?.snapshot?.(() => ({ S }));
+
+  resize();
+  const boot = d => { start(d); };
+  window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
