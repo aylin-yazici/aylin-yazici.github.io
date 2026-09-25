@@ -97,11 +97,13 @@
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---------- state ----------
+  const VERSION = 3;
   let S;
   function freshState() {
     const pre = [[0,0,1,1,0,0],[0,0,0,0,0,1],[1,0,0,0,1,1],[0,0,0,0,0,0],[0,1,1,0,0,0],[1,1,1,1,0,0]];
     return {
-      plates: PLATE_TL.map(([x, y], i) => ({ tx:x, ty:y, x:x + MC[0], y:y + MC[1], slots: pre[i].map(Boolean), bounce:0, pop:0, shake:0 })),
+      v: VERSION,
+      plates: PLATE_TL.map((_, i) => ({ slots: pre[i].map(Boolean), bounce:0, pop:0, shake:0 })),
       shown: GOAL, moves: 0, piece: { start:4, size:2 }, pieceIn: 0, taught: false, won: false,
     };
   }
@@ -404,7 +406,9 @@
     update(dt); render(); requestAnimationFrame(frame);
   }
   function start(data) {
-    S = data && data.S ? data.S : freshState();
+    // only resume a saved game from this same version; positions always come from the Figma layout
+    S = data && data.S && data.S.v === VERSION ? data.S : freshState();
+    S.plates.forEach((p, i) => { p.x = PLATE_TL[i][0] + MC[0]; p.y = PLATE_TL[i][1] + MC[1]; });
     particles = []; flyers = []; fly = null; idle = 0;
     winEl.hidden = !S.won;
   }
