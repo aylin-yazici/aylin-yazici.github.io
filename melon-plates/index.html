@@ -104,10 +104,10 @@
     return {
       v: VERSION,
       plates: PLATE_TL.map((_, i) => ({ slots: pre[i].map(Boolean), bounce:0, pop:0, shake:0 })),
-      shown: GOAL, moves: 0, piece: { start:4, size:2 }, pieceIn: 0, taught: false, won: false,
+      shown: GOAL, moves: 0, combo: 0, piece: { start:4, size:2 }, pieceIn: 0, taught: false, won: false,
     };
   }
-  let fly = null, particles = [], flyers = [], hudBump = 0, t = 0, idle = 0, toast = null, gearSpin = 0, lockWiggle = [0,0,0];
+  let fly = null, particles = [], flyers = [], sparks = [], hudBump = 0, hudFlash = 0, t = 0, idle = 0, toast = null, gearSpin = 0, lockWiggle = [0,0,0];
 
   const fits = (p, pc) => { for (let k = 0; k < pc.size; k++) if (p.slots[(pc.start + k) % 6]) return false; return true; };
   const filled = p => p.slots.filter(Boolean).length;
@@ -128,29 +128,79 @@
     return opts[opts.length - 1].pc;
   }
 
-  // ---------- audio ----------
-  let AC = null, muted = false;
+  // ---------- audio (all synthesized) ----------
+  let AC = null, master = null, verb = null, muted = false, noiseBuf = null;
+  const PENTA = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5, 1568, 1760, 2093];
   function audio() {
-    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+    if (!AC) {
+      try {
+        AC = new (window.AudioContext || window.webkitAudioContext)();
+        master = AC.createDynamicsCompressor(); master.threshold.value = -14; master.ratio.value = 4;
+        const g = AC.createGain(); g.gain.value = .9; master.connect(g).connect(AC.destination);
+        // small generated room reverb
+        const len = AC.sampleRate * 1.1, ir = AC.createBuffer(2, len, AC.sampleRate);
+        for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+        verb = AC.createConvolver(); verb.buffer = ir; verb.connect(master);
+        noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+        const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      } catch (e) { AC = null; }
+    }
     if (AC && AC.state === 'suspended') AC.resume();
     return muted ? null : AC;
   }
-  function tone(f0, f1, dur, type = 'sine', vol = .18, delay = 0) {
+  function route(node, wet) {
+    node.connect(master);
+    if (wet) { const g = AC.createGain(); g.gain.value = wet; node.connect(g).connect(verb); }
+  }
+  function tone({ f0, f1 = f0, dur = .15, type = 'sine', vol = .15, delay = 0, attack = .004, wet = 0 }) {
     const a = audio(); if (!a) return;
     const o = a.createOscillator(), g = a.createGain(), n = a.currentTime + delay;
-    o.type = type; o.frequency.setValueAtTime(f0, n); o.frequency.exponentialRampToValueAtTime(f1, n + dur);
-    g.gain.setValueAtTime(vol, n); g.gain.exponentialRampToValueAtTime(.001, n + dur);
-    o.connect(g).connect(a.destination); o.start(n); o.stop(n + dur + .02);
+    o.type = type; o.frequency.setValueAtTime(f0, n); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, n + dur);
+    g.gain.setValueAtTime(0, n); g.gain.linearRampToValueAtTime(vol, n + attack); g.gain.exponentialRampToValueAtTime(.0005, n + dur);
+    o.connect(g); route(g, wet); o.start(n); o.stop(n + dur + .05);
   }
-  function splat() {
+  function hiss({ dur = .1, vol = .3, delay = 0, type = 'bandpass', f0 = 2000, f1 = f0, q = 1, wet = 0 }) {
     const a = audio(); if (!a) return;
-    const len = a.sampleRate * .35, b = a.createBuffer(1, len, a.sampleRate), d = b.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
-    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = b; f.type = 'lowpass'; f.frequency.value = 1400; g.gain.value = .5;
-    s.connect(f).connect(g).connect(a.destination); s.start();
-    tone(180, 60, .25, 'sine', .35);
+    const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), n = a.currentTime + delay;
+    s.buffer = noiseBuf; s.loop = true;
+    f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, n); if (f1 !== f0) f.frequency.exponentialRampToValueAtTime(f1, n + dur);
+    g.gain.setValueAtTime(vol, n); g.gain.exponentialRampToValueAtTime(.0005, n + dur);
+    s.connect(f).connect(g); route(g, wet); s.start(n, Math.random() * .5); s.stop(n + dur + .05);
   }
+  const bell = (f, vol = .1, delay = 0) => {           // soft glassy bell
+    tone({ f0: f, dur: .5, vol, delay, wet: .35 });
+    tone({ f0: f * 2.76, dur: .18, vol: vol * .25, delay, wet: .35 });
+  };
+  const SFX = {
+    appear() { tone({ f0: 380, f1: 760, dur: .07, type: 'triangle', vol: .05 }); },
+    place(fill) {                                       // wooden "plop" + marimba note that climbs as the plate fills
+      tone({ f0: 320, f1: 130, dur: .08, vol: .3 });
+      hiss({ dur: .03, vol: .12, type: 'lowpass', f0: 2500 });
+      const f = PENTA[Math.min(fill, 6) + 1];
+      tone({ f0: f, dur: .28, vol: .12, wet: .2 }); tone({ f0: f * 4, dur: .06, vol: .03 });
+    },
+    nope() { tone({ f0: 220, f1: 150, dur: .1, type: 'triangle', vol: .14 }); tone({ f0: 200, f1: 140, dur: .12, type: 'triangle', vol: .12, delay: .1 }); },
+    splash(combo) {                                     // crunchy, wet watermelon burst
+      const up = 1 + Math.min(combo, 4) * .06;
+      for (let i = 0; i < 5; i++) hiss({ dur: .025 + Math.random() * .03, vol: .45, delay: i * .014, f0: (2600 + Math.random() * 1800) * up, q: 1.8 });
+      hiss({ dur: .38, vol: .55, type: 'lowpass', f0: 4200 * up, f1: 260, q: 9, delay: .01 });   // squelch
+      hiss({ dur: .22, vol: .2, type: 'bandpass', f0: 900, f1: 400, q: 3, delay: .03 });
+      tone({ f0: 150, f1: 48, dur: .26, vol: .55 });                                               // body thump
+      for (let i = 0; i < 7; i++) {                                                                  // juice drips
+        const f = (420 + Math.random() * 380) * up;
+        tone({ f0: f, f1: f * 2.3, dur: .05, vol: .09, delay: .07 + i * .045 + Math.random() * .03, wet: .45 });
+      }
+    },
+    tick(i, combo) { bell(PENTA[Math.min(i + combo, PENTA.length - 1)], .08); },
+    reward(combo) {
+      const base = Math.min(combo, 3);
+      [0, 2, 4].forEach((n, i) => bell(PENTA[n + base], .07, .03 + i * .06));
+      hiss({ dur: .35, vol: .05, type: 'highpass', f0: 7000, delay: .05, wet: .5 });
+    },
+    lock() { tone({ f0: 900, f1: 700, dur: .05, type: 'square', vol: .03 }); tone({ f0: 180, dur: .12, type: 'triangle', vol: .12, delay: .03 }); },
+    toggle() { tone({ f0: 660, dur: .08, vol: .1 }); tone({ f0: 990, dur: .12, vol: .08, delay: .06 }); },
+    win() { [0, 2, 4, 5, 7].forEach((n, i) => bell(PENTA[n], .1, i * .1)); bell(PENTA[9], .1, .55); bell(PENTA[7], .08, .55); },
+  };
 
   // ---------- sizing ----------
   let scale = 1, dpr = 1;
@@ -192,7 +242,8 @@
   }
   function drawHud() {
     ctx.drawImage(A.hud, 79, 62);
-    const s = 1 + hudBump * .2;
+    if (hudFlash) { ctx.save(); ctx.beginPath(); ctx.roundRect(92, 70, 218, 50, 25); ctx.fillStyle = `rgba(255,236,150,${hudFlash * .55})`; ctx.fill(); ctx.restore(); }
+    const s = 1 + hudBump * .28;
     ctx.save(); ctx.translate(ICON.cx, ICON.cy); ctx.scale(s, s); ctx.drawImage(A.icon, ICON.x - ICON.cx, ICON.y - ICON.cy); ctx.restore();
     ctx.save(); ctx.translate(NUM.x, NUM.y); ctx.scale(s, s);
     ctx.font = '23px "Lilita One", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -220,11 +271,48 @@
     ctx.beginPath(); ctx.roundRect(-16, 22, 40, 38, 14); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
+  function star(x, y, r, rot, color = '#FFE45C') {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const rr = i % 2 ? r * .38 : r, a = i * Math.PI / 4; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, r * .22, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.restore();
+  }
+  function outlined(text, x, y, size, fill) {
+    ctx.font = `${size}px "Lilita One", system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    ctx.lineWidth = size * .22; ctx.strokeStyle = '#0B3C9E'; ctx.strokeText(text, x, y + size * .07);   // drop depth
+    ctx.strokeStyle = BLUE; ctx.strokeText(text, x, y);
+    ctx.fillStyle = fill; ctx.fillText(text, x, y);
+    ctx.save(); ctx.beginPath(); ctx.rect(x - 200, y - size, 400, size * .78); ctx.clip();          // glossy top half
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillText(text, x, y); ctx.restore();
+  }
+  function drawReward(q, k) {
+    const inS = back(Math.min(1, k * 5)), out = k > .72 ? (k - .72) / .28 : 0;
+    const y = q.y - ease(k) * 34, big = 1 + Math.min(q.combo - 1, 3) * .15;
+    ctx.save(); ctx.globalAlpha = 1 - out;
+    // sunburst
+    ctx.save(); ctx.translate(q.x, y); ctx.rotate(k * 1.6); ctx.scale(inS * big, inS * big);
+    const g = ctx.createRadialGradient(0, 0, 8, 0, 0, 92);
+    g.addColorStop(0, 'rgba(255,240,150,.85)'); g.addColorStop(1, 'rgba(255,240,150,0)');
+    ctx.fillStyle = g;
+    for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 92, i * TAU / 12, i * TAU / 12 + TAU / 26); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    for (let i = 0; i < 5; i++) {                       // twinkles around the number
+      const a = i * TAU / 5 + k * 2, r = 42 + ease(k) * 26;
+      star(q.x + Math.cos(a) * r, y + Math.sin(a) * r * .8, 7 * inS * (1 - out), k * 4 + i);
+    }
+    ctx.save(); ctx.translate(q.x, y); ctx.scale(inS * big, inS * big);
+    outlined('+6', 0, -4, 56, '#FFD23F');
+    ctx.restore();
+    const ws = back(Math.min(1, Math.max(0, k - .08) * 5));
+    if (ws > 0) { ctx.save(); ctx.translate(q.x, y + 36); ctx.scale(ws, ws); outlined(q.word, 0, 0, 22, '#fff'); ctx.restore(); }
+    ctx.restore();
+  }
   const showToast = text => { toast = { text, age: 0 }; };
 
   // ---------- effects ----------
   function explode(p) {
-    splat();
+    SFX.splash(S.combo);
     const n = reduceMotion ? 8 : 26;
     for (let i = 0; i < n; i++) {
       const a = Math.random() * TAU, v = 140 + Math.random() * 300, seed = Math.random() < .3;
@@ -242,8 +330,10 @@
       particles.push({ kind: 'wedge', i, x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: .5, age: 0 });
     }
     particles.push({ kind: 'ring', x: p.x, y: p.y, life: .45, age: 0 });
-    particles.push({ kind: 'text', x: p.x, y: p.y - 8, life: 1.1, age: 0 });
-    for (let i = 0; i < 6; i++) flyers.push({ i, x0: p.x, y0: p.y, t: -.25 - i * .09, dur: .6 });
+    const words = ['Juicy!', 'Sweet!', 'Fresh!', 'Yummy!', 'Splash!'];
+    particles.push({ kind: 'reward', x: p.x, y: p.y - 6, life: 1.05, age: 0, combo: S.combo,
+      word: S.combo > 1 ? `Combo x${S.combo}!` : words[(Math.random() * words.length) | 0] });
+    for (let i = 0; i < 6; i++) flyers.push({ i, x0: p.x, y0: p.y, t: -.12 - i * .05, dur: .42, combo: S.combo });
   }
 
   // ---------- input: tap a plate to place ----------
@@ -256,11 +346,11 @@
     if (S.won) return;
     const m = toGame(e);
     if (near(m, GEAR.x, GEAR.y - 4, GEAR.r)) {
-      muted = !muted; gearSpin = 1; if (!muted) tone(600, 900, .08, 'triangle', .12);
+      muted = !muted; gearSpin = 1; if (!muted) SFX.toggle();
       showToast(muted ? 'Sound off' : 'Sound on'); return;
     }
     const li = LOCKS.findIndex(([x, y]) => m.x > x && m.x < x + 96 && m.y > y && m.y < y + 91);
-    if (li >= 0) { audio(); lockWiggle[li] = 1; tone(160, 120, .12, 'square', .06); showToast('Boosters unlock in the full game'); return; }
+    if (li >= 0) { audio(); lockWiggle[li] = 1; SFX.lock(); showToast('Boosters unlock in the full game'); return; }
     if (!S.piece || S.pieceIn < .6 || fly) return;
     const p = S.plates.find(q => !q.pop && near(m, q.x, q.y, PLATE_R + 4));
     if (!p) return;
@@ -268,34 +358,37 @@
     if (fits(p, S.piece)) {
       fly = { piece: S.piece, p, t: 0 };
       S.piece = null; S.pieceIn = 0;
-      tone(420, 620, .07, 'triangle', .12);
+      tone({ f0: 500, f1: 800, dur: .06, type: 'triangle', vol: .06 });
     } else {
-      p.shake = 1; tone(200, 140, .12, 'square', .06);
+      p.shake = 1; S.combo = 0; SFX.nope();
     }
   });
   function land(f) {
     const p = f.p;
     for (let k = 0; k < f.piece.size; k++) p.slots[(f.piece.start + k) % 6] = true;
     p.bounce = 1; S.moves++;
-    tone(300, 180, .09, 'sine', .25);
-    if (filled(p) === 6) setTimeout(() => { p.pop = .001; }, 140);
-    setTimeout(() => { if (!S.won) { S.piece = newPiece(); S.pieceIn = 0; } }, 180);
+    SFX.place(filled(p));
+    if (filled(p) === 6) { p.pop = .001; S.combo++; } else S.combo = 0;
+    setTimeout(() => { if (!S.won) { S.piece = newPiece(); S.pieceIn = 0; SFX.appear(); } }, 120);
   }
   document.getElementById('again').addEventListener('click', () => start({}));
 
   // ---------- loop ----------
   function update(dt) {
     t += dt; idle += dt;
-    hudBump = Math.max(0, hudBump - dt * 4);
+    hudBump = Math.max(0, hudBump - dt * 5);
+    hudFlash = Math.max(0, hudFlash - dt * 3);
+    for (const q of sparks) { q.age += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= .94; q.vy *= .94; }
+    sparks = sparks.filter(q => q.age < q.life);
     gearSpin = Math.max(0, gearSpin - dt * 2.5);
     lockWiggle = lockWiggle.map(w => Math.max(0, w - dt * 2.5));
     if (toast && (toast.age += dt) > 1.6) toast = null;
     if (S.piece) S.pieceIn = Math.min(1, S.pieceIn + dt * 4);
-    if (fly && (fly.t += dt / .22) >= 1) { const f = fly; fly = null; land(f); }
+    if (fly && (fly.t += dt / .16) >= 1) { const f = fly; fly = null; land(f); }
     for (const p of S.plates) {
       p.bounce = Math.max(0, p.bounce - dt * 5);
       p.shake = Math.max(0, p.shake - dt * 2.5);
-      if (p.pop > 0) { p.pop += dt * 6; if (p.pop >= 1) { p.pop = 0; explode(p); p.slots = p.slots.map(() => false); } }
+      if (p.pop > 0) { p.pop += dt * 14; if (p.pop >= 1) { p.pop = 0; explode(p); p.slots = p.slots.map(() => false); } }
     }
     for (const q of particles) {
       q.age += dt;
@@ -305,9 +398,11 @@
     for (const f of flyers) {
       f.t += dt / f.dur;
       if (f.t >= 1 && !f.done) {
-        f.done = true; S.shown = Math.max(0, S.shown - 1); hudBump = 1;
-        const step = (GOAL - S.shown) % 12;
-        tone(700 + step * 40, 1100 + step * 40, .08, 'triangle', .1);
+        f.done = true; S.shown = Math.max(0, S.shown - 1); hudBump = 1; hudFlash = 1;
+        SFX.tick(f.i, Math.min(f.combo - 1, 3));
+        for (let j = 0; j < 3; j++) { const a = Math.random() * TAU, v = 60 + Math.random() * 90;
+          sparks.push({ x: ICON.cx, y: ICON.cy + 8, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 5 + Math.random() * 4, age: 0, life: .5 + Math.random() * .3, rot: Math.random() * 3 }); }
+        if (f.i === 5) SFX.reward(f.combo);
       }
     }
     flyers = flyers.filter(f => !f.done);
@@ -316,7 +411,7 @@
       setTimeout(() => {
         document.getElementById('winText').textContent = `You collected all ${GOAL} slices in ${S.moves} moves.`;
         winEl.hidden = false; document.getElementById('again').focus();
-        tone(523, 523, .15, 'triangle', .15); tone(659, 659, .15, 'triangle', .15, .12); tone(784, 1046, .3, 'triangle', .15, .24);
+        SFX.win();
       }, 450);
     }
   }
@@ -349,15 +444,7 @@
         ctx.drawImage(A[q.sheet], sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh); ctx.restore();
       } else if (q.kind === 'wedge') { drawSlice(q.x, q.y, q.i, 1 - k * .4); }
       else if (q.kind === 'ring') { ctx.globalAlpha = (1 - k) * .85; ctx.beginPath(); ctx.arc(q.x, q.y, PLATE_R + ease(k) * 60, 0, TAU); ctx.strokeStyle = '#fff'; ctx.lineWidth = 9 * (1 - k); ctx.stroke(); }
-      else if (q.kind === 'text') {
-        ctx.globalAlpha = k < .7 ? 1 : 1 - (k - .7) / .3;
-        const s = back(Math.min(1, k * 4));
-        ctx.save(); ctx.translate(q.x, q.y - ease(k) * 50); ctx.scale(s, s);
-        ctx.font = '54px "Lilita One", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.lineJoin = 'round'; ctx.lineWidth = 10; ctx.strokeStyle = BLUE; ctx.strokeText('+6', 0, 0);
-        ctx.fillStyle = '#FFD84A'; ctx.fillText('+6', 0, 0);
-        ctx.restore();
-      }
+      else if (q.kind === 'reward') drawReward(q, k);
       ctx.globalAlpha = 1;
     }
 
@@ -366,8 +453,11 @@
       const k = ease(f.t), cx = (f.x0 + ICON.cx) / 2 + (f.i - 2.5) * 28, cy = Math.min(f.y0, ICON.cy) - 60;
       const x = (1 - k) * (1 - k) * f.x0 + 2 * (1 - k) * k * cx + k * k * ICON.cx;
       const y = (1 - k) * (1 - k) * f.y0 + 2 * (1 - k) * k * cy + k * k * ICON.cy;
-      ctx.save(); ctx.translate(x, y); ctx.rotate((1 - k) * 3); ctx.scale(1.3 - k * .3, 1.3 - k * .3); ctx.drawImage(A.icon, -17, -15); ctx.restore();
+      ctx.save(); ctx.globalAlpha = .5; star(x, y + 6, 12 * (1 - k), k * 6, '#FFF3B0'); ctx.restore();
+      ctx.save(); ctx.translate(x, y); ctx.rotate((1 - k) * 3); ctx.scale(1.4 - k * .4, 1.4 - k * .4); ctx.drawImage(A.icon, -17, -15); ctx.restore();
     }
+
+    for (const q of sparks) star(q.x, q.y, q.r * (1 - q.age / q.life), q.rot + q.age * 5);
 
     if (fly) {
       const k = ease(fly.t), a = Math.sin(k * Math.PI);
@@ -409,7 +499,7 @@
     // only resume a saved game from this same version; positions always come from the Figma layout
     S = data && data.S && data.S.v === VERSION ? data.S : freshState();
     S.plates.forEach((p, i) => { p.x = PLATE_TL[i][0] + MC[0]; p.y = PLATE_TL[i][1] + MC[1]; });
-    particles = []; flyers = []; fly = null; idle = 0;
+    particles = []; flyers = []; sparks = []; fly = null; idle = 0; S.combo = S.combo || 0;
     winEl.hidden = !S.won;
   }
   window.claude?.hot?.snapshot?.(() => ({ S }));
