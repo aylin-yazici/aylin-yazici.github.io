@@ -84,7 +84,7 @@
   const LOCKS = [[42,739,'lockA'],[153,739,'lockB'],[263,739,'lockA']];
   const PLATE_R = 70;
   const MAX_LIVES = 7, START_LIVES = 7;
-  const HEARTS = { y: 156, gap: 21, s: .37 };       // row of 7 under the goal bar, as in the design
+  const HEARTS = { y: 162, gap: 31, s: .54 };       // row of 7 under the goal bar
   const HAND_TIP = [3, 3];                  // fingertip inside the hand image
   // menu (frame "iPhone 17 - 2")
   const TOPBAR = { x: 21, y: 43 };
@@ -101,10 +101,10 @@
       script: [{ fruit:'m', start:4, size:2, hint:0, spot: true, tip: 'Tap a plate to put the slices on it' },
                { fruit:'m', start:0, size:3, hint:1, tip: 'Fill all 6 spots to serve the fruit!' },
                { fruit:'m', start:3, size:3, hint:2 }] },
-    { n: 4, goals: { m: 12 }, hintDelay: 3, pFit: 1, livesIntro: true, intro: 'Nice!',
+    { n: 4, goals: { m: 12 }, hintDelay: .5, pFit: 1, livesIntro: true, intro: 'Nice!',
       pre: [['m',[1,1,0,0,0,1]], ['m',[0,0,1,1,1,0]], ['m',[0,0,0,1,0,0]], ['m',[0,0,1,0,0,0]]],
-      script: [{ fruit:'m', start:2, size:3, hint:0, tip: 'Pick a plate with room for the slices' },
-               { fruit:'m', start:5, size:3, hint:1 }] },
+      script: [{ fruit:'m', start:2, size:3, hint:1, demoWrong: true, tip: 'What if the slices don\u2019t fit? Tap this plate to see!' },
+               { fruit:'m', start:5, size:3, hint:1, tip: 'Serve another plate right away for a COMBO!' }] },
     { n: 4, goals: { m: 6, l: 12 }, hintDelay: 1.5, pFit: 1, newFruit: 'l', intro: 'New fruit unlocked!',
       pre: [['m',[1,1,1,0,0,0]], ['l',[1,1,1,1,0,0]], ['l',[0,0,1,1,1,0]], [null,E]],
       script: [{ fruit:'l', start:4, size:2, hint:1, tip: 'Lemons and watermelons can\u2019t share a plate' },
@@ -141,7 +141,7 @@
   const clamp01 = x => Math.max(0, Math.min(1, x));
 
   // ---------- state ----------
-  const VERSION = 6;
+  const VERSION = 7;
   let S, scene = 'menu';
   let fly = null, particles = [], flyers = [], sparks = [], hudBump = { m:0, l:0 }, hudFlash = 0, t = 0, idle = 0,
       toast = null, note = null, gearSpin = 0, lockWiggle = [0,0,0], fade = 0, btnPress = 0, redFlash = 0,
@@ -180,7 +180,7 @@
     const st = cfg();
     while (S.script < st.script.length) {                   // tutorial pieces, skipped if the board no longer allows them
       const sp = st.script[S.script++];
-      const pc = { fruit: sp.fruit, start: sp.start, size: sp.size, hint: sp.hint, tip: sp.tip, spot: sp.spot };
+      const pc = { fruit: sp.fruit, start: sp.start, size: sp.size, hint: sp.hint, tip: sp.tip, spot: sp.spot, demoWrong: sp.demoWrong };
       if (anyFit(pc)) return pc;
     }
     const fr = fruitsOf(st).filter(f => S.left[f] > 0);
@@ -207,6 +207,7 @@
   }
   // best plate for the hand to point at
   function hintPlate(pc) {
+    if (pc.demoWrong) return S.plates[pc.hint];
     if (pc.hint !== undefined && fits(S.plates[pc.hint], pc)) return S.plates[pc.hint];
     const ok = S.plates.filter(p => fits(p, pc));
     return ok.find(p => filled(p) + pc.size === 6) || ok.find(p => p.fruit === pc.fruit) || ok[0];
@@ -475,7 +476,7 @@
     particles.push({ kind: 'reward', x: p.x, y: p.y - 6, life: 1.15, age: 0, combo: S.combo,
       word: combo ? (S.lives < MAX_LIVES ? `Combo! +1 life` : `Combo x${S.combo}!`) : fx.words[(Math.random() * fx.words.length) | 0] });
     for (let i = 0; i < 6; i++) flyers.push({ kind: 'slice', fruit, i, x0: p.x, y0: p.y, t: -.12 - i * .05, dur: .42, combo: S.combo });
-    if (combo && S.livesShown && !S.comboTaught) { S.comboTaught = true; note = { text: 'Combo! Back-to-back plates win back a lost life', age: 0 }; }
+    if (combo && S.livesShown && !S.comboTaught && S.lives < MAX_LIVES) { S.comboTaught = true; note = { text: 'COMBO! You won back a life', age: -.9, hold: true, spot: true }; }
     // a combo (two full plates from back-to-back placements) earns a life
     if (combo && S.lives + flyers.filter(f => f.kind === 'heart').length < MAX_LIVES) {
       flyers.push({ kind: 'heart', x0: p.x, y0: p.y - 20, t: -.35, dur: .7, slot: S.lives + flyers.filter(f => f.kind === 'heart').length });
@@ -549,9 +550,17 @@
     if (S.phase !== 'play') return;
     const li = LOCKS.findIndex(([x, y]) => m.x > x && m.x < x + 96 && m.y > y && m.y < y + 91);
     if (li >= 0) { lockWiggle[li] = 1; SFX.lock(); return showToast('Boosters unlock in the full game'); }
+    if (note && note.hold) { if (note.age < 1.2) return; note = null; }   // after a moment a tap closes the note and still counts
     if (!S.piece || S.pieceIn < .6 || fly) return;
     const p = S.plates.find(q => !q.pop && near(m, q.x, q.y, PLATE_R + 4));
     if (!p) return;
+    if (S.piece.demoWrong) {                                // lesson: tap the plate where it does not fit
+      if (p !== S.plates[S.piece.hint]) return;
+      p.shake = 1; S.combo = 0; loseLife();
+      Object.assign(S.piece, { demoWrong: false, hint: undefined, tip: 'Now tap a plate where it fits' });
+      note = { text: 'Ouch! A wrong plate costs a life', age: 0, hold: true, spot: true };
+      idle = -1.2; return;
+    }
     idle = 0;
     if (fits(p, S.piece)) {
       fly = { piece: S.piece, p, t: 0 };
@@ -573,7 +582,8 @@
   }
   function spawnPiece() {
     if (scene !== 'game' || S.phase !== 'play' || S.piece || fly) return;
-    if (fruitsOf(cfg()).every(f => S.left[f] === 0)) return;           // stage is finishing
+    const pending = f => flyers.filter(q => q.kind === 'slice' && q.fruit === f).length + S.plates.filter(q => q.pop && q.fruit === f).length * 6;
+    if (fruitsOf(cfg()).every(f => S.left[f] - pending(f) <= 0)) return;   // stage is finishing
     S.piece = newPiece(); S.pieceIn = 0; idle = 0; SFX.appear();
     if (!anyFit(S.piece)) endStage('moves');
   }
@@ -584,7 +594,7 @@
     fade = Math.max(0, fade - dt * 3);
     gearSpin = Math.max(0, gearSpin - dt * 2.5);
     if (toast && (toast.age += dt) > 1.6) toast = null;
-    if (note && (note.age += dt) > 3.2) note = null;
+    if (note && (note.age += dt) > (note.hold ? 3.6 : 3.2)) note = null;
     if (scene !== 'game') return;
     hudBump.m = Math.max(0, hudBump.m - dt * 5); hudBump.l = Math.max(0, hudBump.l - dt * 5);
     hudFlash = Math.max(0, hudFlash - dt * 3);
@@ -637,7 +647,7 @@
     } else if (S.phase === 'lives') {
       if (S.phaseT > .3 && S.phaseT < 1.2 && Math.floor((S.phaseT - .25) / .09) !== Math.floor((S.phaseT - .25 - dt) / .09)) tone({ f0: 500 + S.phaseT * 400, dur: .08, vol: .06 });
     } else if (S.phase === 'play') {
-      if (fruitsOf(st).every(f => S.left[f] === 0) && !flyers.length && !fly && !S.plates.some(p => p.pop)) {
+      if (fruitsOf(st).every(f => S.left[f] === 0) && !flyers.length && !fly && !S.plates.some(p => p.pop) && !note) {
         S.phase = 'clear'; S.phaseT = 0; S.piece = null; SFX.banner();
       }
     } else if (S.phase === 'clear') {
@@ -720,14 +730,14 @@
     }
 
     // hand: shows the plate to tap (tutorial right away, later only after a pause)
-    if (S.phase === 'play' && S.piece && S.pieceIn >= 1 && !fly && idle > st.hintDelay && !S.piece.spot) {
+    if (S.phase === 'play' && S.piece && S.pieceIn >= 1 && !fly && idle > st.hintDelay && !S.piece.spot && !S.piece.demoWrong && !(note && note.hold)) {
       const tgt = hintPlate(S.piece);
       if (tgt) drawHintHand(tgt, st);
     }
 
     // tutorial tip for the current piece (first step also spotlights the plate and the generator)
     const tipPiece = S.piece || (fly && fly.piece);
-    if (S.phase === 'play' && tipPiece && tipPiece.tip && S.piece) {
+    if (S.phase === 'play' && tipPiece && tipPiece.tip && S.piece && !(note && note.hold)) {
       const tgt = hintPlate(S.piece), a = clamp01(S.pieceIn * 2);
       if (S.piece.spot && tgt) {
         spotlight([{ x: tgt.x, y: tgt.y, r: PLATE_R + 8 }, { x: GEN.x, y: GEN.y, r: PLATE_R + 8 }], a);
@@ -736,20 +746,25 @@
         ctx.save(); ctx.translate(GEN.x, GEN.y); drawPiece(S.piece, 0, 0); ctx.restore();
       }
       drawBubble(S.piece.tip, W / 2, 648, { alpha: a, pop: back(clamp01(S.pieceIn * 1.5)) });
-      if (S.piece.spot && tgt && idle > st.hintDelay) drawHintHand(tgt, st);
+      if ((S.piece.spot || S.piece.demoWrong) && tgt && idle > st.hintDelay) drawHintHand(tgt, st);
     }
     // lives introduction: dim everything but the hearts
     if (S.phase === 'lives') {
-      const a = clamp01(S.phaseT * 3), x0 = heartPos(0)[0] - 16, x1 = heartPos(MAX_LIVES - 1)[0] + 16;
-      spotlight([{ x: x0, y: HEARTS.y - 16, w: x1 - x0, h: 32 }], a);
+      const a = clamp01(S.phaseT * 3), x0 = heartPos(0)[0] - 20, x1 = heartPos(MAX_LIVES - 1)[0] + 20;
+      spotlight([{ x: x0, y: HEARTS.y - 20, w: x1 - x0, h: 40 }], a);
       drawHearts();
-      drawBubble(`You have ${MAX_LIVES} lives! Tapping a plate where the slices don’t fit costs one.`, W / 2, HEARTS.y + 30,
+      drawBubble(`These are your lives. You have ${MAX_LIVES}!`, W / 2, HEARTS.y + 34,
         { tail: -1, tx: W / 2, alpha: clamp01((S.phaseT - .5) * 3), pop: back(clamp01((S.phaseT - .5) * 3)) });
       if (S.phaseT > 1.1) { ctx.save(); ctx.globalAlpha = .6 + .4 * Math.sin(t * 5); outlined('Tap to continue', W / 2, 330, 20, '#fff'); ctx.restore(); }
     }
-    if (note && S.phase !== 'lives') {
-      const a = Math.min(1, note.age * 5, (3.2 - note.age) * 3);
-      drawBubble(note.text, W / 2, HEARTS.y + 30, { tail: -1, tx: W / 2, alpha: a, pop: back(clamp01(note.age * 4)) });
+    if (note && note.age > 0 && S.phase !== 'lives') {
+      const end = note.hold ? 3.6 : 3.2, a = Math.min(1, note.age * 5, (end - note.age) * 3);
+      if (note.spot) {
+        const x0 = heartPos(0)[0] - 20, x1 = heartPos(MAX_LIVES - 1)[0] + 20;
+        spotlight([{ x: x0, y: HEARTS.y - 20, w: x1 - x0, h: 40 }], a);
+        drawHearts();
+      }
+      drawBubble(note.text, W / 2, HEARTS.y + 34, { tail: -1, tx: W / 2, alpha: a, pop: back(clamp01(note.age * 4)) });
     }
 
     // stage banner
@@ -779,7 +794,7 @@
   }
   function drawHintHand(tgt, st) {
     const c = ((idle - st.hintDelay) % 1.3) / 1.3, appear = clamp01((idle - st.hintDelay) * 4);
-    drawPiece(S.piece, tgt.x, tgt.y, 1, (.3 + .2 * Math.sin(c * TAU)) * appear);
+    if (fits(tgt, S.piece)) drawPiece(S.piece, tgt.x, tgt.y, 1, (.3 + .2 * Math.sin(c * TAU)) * appear);
     let hx = tgt.x + 12, hy = tgt.y + 14, press = 0;
     if (c < .35) { const k = ease(c / .35); hx += (1 - k) * 34; hy += (1 - k) * 34; }
     else if (c < .6) press = (c - .35) / .25;
