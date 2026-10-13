@@ -431,7 +431,7 @@
   // obstacle reveal before the first ice stage: title, item tile, explanation banner; tap anywhere to continue
   function drawObstacleIntro(k) {
     // same look as the tutorial: 65% black dim, title in Goldplay, the tutorial bubble for the explanation
-    ctx.fillStyle = `rgba(0,0,0,${.65 * clamp01(k * 3)})`; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(0,0,0,${.92 * clamp01(k * 3)})`; ctx.fillRect(0, 0, W, H);   // darker than the tutorial dim so the level stays in the background
     const tk = back(clamp01((k - .1) * 3));
     if (tk > 0) { ctx.save(); ctx.translate(W / 2, 222); ctx.scale(tk, tk); outlined('Ice!', 0, 0, 56, '#FFFFFF'); ctx.restore(); }
     const sk = back(clamp01((k - .3) * 3));
@@ -441,10 +441,10 @@
       ctx.save(); ctx.translate(W / 2, 425); ctx.scale(pk, pk);
       // soft white glow and slow rays behind the plate
       const glow = ctx.createRadialGradient(0, 0, 40, 0, 0, 150);
-      glow.addColorStop(0, 'rgba(255,255,255,.35)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
+      glow.addColorStop(0, 'rgba(255,255,255,.22)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 150, 0, TAU); ctx.fill();
       ctx.save(); ctx.rotate(t * .3);
-      const g = ctx.createRadialGradient(0, 0, 60, 0, 0, 165); g.addColorStop(0, 'rgba(255,255,255,.22)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g;
+      const g = ctx.createRadialGradient(0, 0, 60, 0, 0, 165); g.addColorStop(0, 'rgba(255,255,255,.14)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g;
       for (let i = 0; i < 10; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 165, i * TAU / 10, i * TAU / 10 + TAU / 30); ctx.closePath(); ctx.fill(); }
       ctx.restore();
       ctx.save(); ctx.scale(1.25, 1.25);
