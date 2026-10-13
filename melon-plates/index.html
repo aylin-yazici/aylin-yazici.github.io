@@ -342,8 +342,6 @@
     ctx.save(); ctx.translate(p.x + ox + dx, p.y + oy); ctx.rotate(rot); ctx.scale(s, s);
     ctx.drawImage(A.plate, -MC[0], -MC[1]);
     if (p.shake) { ctx.beginPath(); ctx.arc(0, 0, PLATE_R - 1, 0, TAU); ctx.strokeStyle = `rgba(255,77,77,${p.shake})`; ctx.lineWidth = 5; ctx.stroke(); }
-    if (p.ice) drawIceBase(p.slots);
-    else if (p.iceBreak > 0) drawIceBase(p.slots, p.iceBreak, 1 + (1 - p.iceBreak) * .25);
     p.slots.forEach((on, j) => { if (on) drawSlice(0, 0, p.fruit, j); });
     if (p.ice) drawIce(p.slots);
     else if (p.iceBreak > 0) drawIce(p.slots, p.iceBreak, 1 + (1 - p.iceBreak) * .25);
@@ -369,18 +367,6 @@
     if (runs === 'full') { ctx.arc(cx, cy, R, 0, TAU); return; }
     for (const [a0, a1] of runs) { ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath(); }
   }
-  // the slab's shadow and side wall go under the fruit, so only the thickness shows below the edge
-  function drawIceBase(slots, a = 1, grow = 1) {
-    if (!slots.some(Boolean)) return;
-    const runs = iceRuns(slots), R = (FRUIT_R + 4) * grow, D = 7;
-    ctx.save(); ctx.globalAlpha *= a; ctx.lineJoin = 'round';
-    icePath(runs, R, D + 4); ctx.fillStyle = 'rgba(20,60,120,.18)'; ctx.fill();
-    icePath(runs, R, D);
-    const side = ctx.createLinearGradient(0, -R, 0, R + D);
-    side.addColorStop(0, 'rgba(120,195,245,.95)'); side.addColorStop(1, 'rgba(45,125,205,1)');
-    ctx.fillStyle = side; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(35,105,185,.95)'; ctx.stroke();
-    ctx.restore();
-  }
   function drawIce(slots, a = 1, grow = 1) {
     if (!slots.some(Boolean)) return;
     const runs = iceRuns(slots), R = (FRUIT_R + 4) * grow;
@@ -388,60 +374,69 @@
     // top face: the exported ice block, scaled to the fruit circle and cut to the frozen slices
     icePath(runs, R);
     ctx.save(); ctx.clip();
-    const bs = R * 2.3;
-    ctx.globalAlpha *= .92; ctx.drawImage(A.iceBlock, FRUIT_C[0] - bs / 2, FRUIT_C[1] - bs / 2, bs, bs); ctx.globalAlpha /= .92;
-    // soft glow along the cut edge so partial slabs keep a bevel
-    icePath(runs, R); ctx.lineWidth = 10; ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.stroke();
+    // the block's front face (centre 120,150; about 95 by 78 px half-size in the 240px image) lines up with the fruit
+    const sx = R * 1.06 / 95, sy = R * 1.06 / 78;
+    ctx.globalAlpha *= .9; ctx.drawImage(A.iceBlock, FRUIT_C[0] - 120 * sx, FRUIT_C[1] - 150 * sy, 240 * sx, 240 * sy); ctx.globalAlpha /= .9;
     ctx.restore();
-    icePath(runs, R);
-    const e = ctx.createLinearGradient(-R, -R, R, R);
-    e.addColorStop(0, '#FFFFFF'); e.addColorStop(.5, '#CBEBFF'); e.addColorStop(1, '#5AA8E6');
-    ctx.lineWidth = 2.5; ctx.strokeStyle = e; ctx.stroke();
+    icePath(runs, R); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(95,170,230,.9)'; ctx.stroke();
     // twinkle
     const tw = Math.sin(t * 2.4);
     if (tw > .3) star(FRUIT_C[0] - R * .38, FRUIT_C[1] - R * .48, 2.5 + (tw - .3) * 9, t, '#FFFFFF');
     ctx.restore();
   }
-  // "New Obstacle!" card shown before the first ice stage
-  const OB_BTN = { x: W / 2, y: 430 + 158, w: 170, h: 50 };
-  function drawObstacleCard(k) {
-    const a = clamp01(k * 3), pop = back(clamp01((k - .1) * 2.5));
-    ctx.fillStyle = `rgba(6,24,70,${.62 * a})`; ctx.fillRect(0, 0, W, H);
-    if (pop <= 0) return;
-    ctx.save(); ctx.translate(W / 2, 430); ctx.scale(pop, pop);
-    const cw = 304, ch = 384, x0 = -cw / 2, y0 = -ch / 2;
-    ctx.beginPath(); ctx.roundRect(x0, y0 + 7, cw, ch, 30); ctx.fillStyle = '#154AB0'; ctx.fill();
-    ctx.beginPath(); ctx.roundRect(x0, y0, cw, ch, 30); ctx.fillStyle = '#FFF4E6'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = BLUE; ctx.stroke();
-    // light rays behind the frozen plate
-    ctx.save(); ctx.translate(0, -58); ctx.rotate(t * .4);
-    const g = ctx.createRadialGradient(0, 0, 10, 0, 0, 130);
-    g.addColorStop(0, 'rgba(150,220,255,.75)'); g.addColorStop(1, 'rgba(150,220,255,0)'); ctx.fillStyle = g;
-    for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 130, i * TAU / 12, i * TAU / 12 + TAU / 26); ctx.closePath(); ctx.fill(); }
-    ctx.restore();
-    ctx.save(); ctx.translate(0, -58 + Math.sin(t * 2) * 3); ctx.scale(1.04, 1.04);
-    const demo = [1, 1, 1, 0, 1, 1].map(Boolean);
-    ctx.drawImage(A.plate, -MC[0], -MC[1]); drawIceBase(demo); demo.forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawIce(demo);
-    ctx.restore();
-    // ribbon
-    ctx.save(); ctx.translate(0, y0 + 2);
-    ctx.fillStyle = '#154AB0';
-    ctx.beginPath(); ctx.moveTo(-138, -6); ctx.lineTo(-112, -6); ctx.lineTo(-112, 30); ctx.lineTo(-138, 30); ctx.lineTo(-126, 12); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(138, -6); ctx.lineTo(112, -6); ctx.lineTo(112, 30); ctx.lineTo(138, 30); ctx.lineTo(126, 12); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(-118, -24, 236, 48, 16); ctx.fillStyle = BLUE; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
-    outlined('New Obstacle!', 0, 0, 26, '#fff');
-    ctx.restore();
-    outlined('Ice', 0, 50, 42, '#C9F0FF');
-    ctx.font = '18px "Lilita One", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = BLUE;
-    wrap('Serve a plate next to the ice to break it!', 240).forEach((l, i) => ctx.fillText(l, 0, 90 + i * 22));
-    if (k > .6) {
-      const bp = 1 + Math.sin(t * 4) * .03;
-      ctx.save(); ctx.translate(0, 158); ctx.scale(bp, bp);
-      ctx.beginPath(); ctx.roundRect(-OB_BTN.w / 2, -OB_BTN.h / 2 + 5, OB_BTN.w, OB_BTN.h, 20); ctx.fillStyle = '#22912B'; ctx.fill();
-      ctx.beginPath(); ctx.roundRect(-OB_BTN.w / 2, -OB_BTN.h / 2, OB_BTN.w, OB_BTN.h, 20); ctx.fillStyle = '#43C94B'; ctx.fill();
-      outlined('Got it!', 0, 0, 24, '#fff', '#1D7A25', '#13561A');
+  // obstacle reveal before the first ice stage: title, item tile, explanation banner; tap anywhere to continue
+  function drawObstacleIntro(k) {
+    ctx.fillStyle = `rgba(6,22,64,${.78 * clamp01(k * 3)})`; ctx.fillRect(0, 0, W, H);
+    // title drops in, subtitle follows
+    const tk = back(clamp01((k - .1) * 3));
+    if (tk > 0) { ctx.save(); ctx.translate(W / 2, 182 - (1 - clamp01((k - .1) * 3)) * 40); ctx.scale(tk, tk); outlined('Ice!', 0, 0, 64, '#FFFFFF'); ctx.restore(); }
+    const sk = back(clamp01((k - .3) * 3));
+    if (sk > 0) { ctx.save(); ctx.translate(W / 2, 250); ctx.scale(sk, sk); outlined('New obstacle unlocked!', 0, 0, 27, '#FFE680'); ctx.restore(); }
+    // item tile with the frozen plate
+    const pk = back(clamp01((k - .45) * 2.6));
+    if (pk > 0) {
+      ctx.save(); ctx.translate(W / 2, 430); ctx.scale(pk, pk);
+      ctx.save(); ctx.rotate(t * .35);
+      const g = ctx.createRadialGradient(0, 0, 20, 0, 0, 175); g.addColorStop(0, 'rgba(150,215,255,.45)'); g.addColorStop(1, 'rgba(150,215,255,0)'); ctx.fillStyle = g;
+      for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 175, i * TAU / 12, i * TAU / 12 + TAU / 28); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+      const S2 = 150;
+      ctx.beginPath(); ctx.roundRect(-S2 / 2 - 6, -S2 / 2 - 6 + 6, S2 + 12, S2 + 12, 24); ctx.fillStyle = '#0B3C9E'; ctx.fill();
+      ctx.beginPath(); ctx.roundRect(-S2 / 2 - 6, -S2 / 2 - 6, S2 + 12, S2 + 12, 24); ctx.fillStyle = '#7CC4FF'; ctx.fill();
+      const tg = ctx.createLinearGradient(0, -S2 / 2, 0, S2 / 2); tg.addColorStop(0, '#2F7BEA'); tg.addColorStop(1, '#1A4FBF');
+      ctx.beginPath(); ctx.roundRect(-S2 / 2, -S2 / 2, S2, S2, 18); ctx.fillStyle = tg; ctx.fill();
+      ctx.save(); ctx.scale(.95, .95);
+      const demo = [1, 1, 1, 0, 1, 1].map(Boolean);
+      ctx.drawImage(A.plate, -MC[0], -MC[1]); demo.forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawIce(demo);
+      ctx.restore();
+      for (let i = 0; i < 6; i++) {                       // twinkles around the tile
+        const a = i * TAU / 6 + .4, tw = Math.sin(t * 3 + i * 1.3);
+        if (tw > 0) star(Math.cos(a) * 112, Math.sin(a) * 106, 4 + tw * 6, t + i, '#FFF3B0');
+      }
       ctx.restore();
     }
-    ctx.restore();
+    // explanation banner slides up
+    const bk = ease(clamp01((k - .7) * 3));
+    if (bk > 0) {
+      ctx.save(); ctx.globalAlpha = bk; ctx.translate(W / 2, 626 + (1 - bk) * 40);
+      const bw = 350, bh = 86;
+      ctx.beginPath(); ctx.roundRect(-bw / 2, -bh / 2 + 6, bw, bh, 22); ctx.fillStyle = '#154AB0'; ctx.fill();
+      ctx.beginPath(); ctx.roundRect(-bw / 2, -bh / 2, bw, bh, 22); ctx.fillStyle = BLUE; ctx.fill();
+      ctx.beginPath(); ctx.roundRect(-bw / 2 + 7, -bh / 2 + 7, bw - 14, bh - 14, 16); ctx.fillStyle = '#FFF4E6'; ctx.fill();
+      ctx.font = '21px "Lilita One", system-ui, sans-serif'; ctx.textBaseline = 'middle';
+      richLine([['Break the ', BLUE], ['ICE', '#1AA0E8'], [' by serving a', BLUE]], 0, -13);
+      richLine([['plate next to it!', BLUE]], 0, 14);
+      ctx.restore();
+    }
+    if (k > 1.3) { ctx.save(); ctx.globalAlpha = .55 + .45 * Math.sin(t * 5); outlined('Tap to continue', W / 2, 735, 19, '#fff'); ctx.restore(); }
+  }
+  // one centred line of text made of differently coloured parts
+  function richLine(parts, x, y) {
+    ctx.textAlign = 'left';
+    const w = parts.reduce((a, [s2]) => a + ctx.measureText(s2).width, 0);
+    let cx = x - w / 2;
+    for (const [s2, c] of parts) { ctx.fillStyle = c; ctx.fillText(s2, cx, y); cx += ctx.measureText(s2).width; }
+    ctx.textAlign = 'center';
   }
   function drawBackground() { ctx.drawImage(A.bg, 0, 0, W, W * A.bg.height / A.bg.width); }
   function drawCheck(x, y) {
@@ -601,15 +596,14 @@
   function breakIce(q) {
     if (!q.ice) return;
     q.ice = false; q.iceBreak = 1; q.bounce = 1; SFX.ice();
-    q.slots.forEach((on, j) => {
-      if (!on) return;
-      const mid = -Math.PI / 2 + j * SEG + SEG / 2, bx = q.x + Math.cos(mid) * 32, by = q.y + Math.sin(mid) * 32;
-      for (let i = 0; i < (reduceMotion ? 2 : 5); i++) {
-        const a = mid + (Math.random() - .5) * 1.6, v = 110 + Math.random() * 220;
-        particles.push({ kind: 'shard', img: 'ice' + ((Math.random() * ICE_SHARDS) | 0), x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 150,
-          s: .35 + Math.random() * .3, life: .7 + Math.random() * .4, age: 0, rot: Math.random() * TAU, vr: (Math.random() - .5) * 10 });
-      }
-    });
+    const n = q.slots.filter(Boolean).length * (reduceMotion ? 2 : 4) + 6;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + (Math.random() - .5) * .5, v = 140 + Math.random() * 170, r0 = 10 + Math.random() * 30;
+      particles.push({ kind: 'shard', img: 'ice' + ((Math.random() * ICE_SHARDS) | 0), x: q.x + Math.cos(a) * r0, y: q.y + Math.sin(a) * r0,
+        vx: Math.cos(a) * v, vy: Math.sin(a) * v, drag: true,
+        s: .3 + Math.random() * .32, life: .6 + Math.random() * .3, age: 0, rot: Math.random() * TAU, vr: (Math.random() - .5) * 8 });
+    }
+    particles.push({ kind: 'ring', x: q.x, y: q.y, life: .35, age: 0, ice: true });
     for (let j = 0; j < 6; j++) { const a = Math.random() * TAU, v = 50 + Math.random() * 90;
       sparks.push({ x: q.x, y: q.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 6 + Math.random() * 4, age: 0, life: .6, rot: Math.random() * 3, color: '#DFF6FF' }); }
     // a spawned piece may now fit where it didn't before; nothing else to do
@@ -680,7 +674,7 @@
     if (near(m, GEAR.x, GEAR.y - 4, GEAR.r)) return toggleSound(true);
     if (S.phase === 'lives') { if (S.phaseT > 1.1) { S.phase = 'play'; S.phaseT = 0; SFX.appear(); spawnPiece(); } return; }
     if (S.phase === 'obstacle') {
-      if (S.phaseT > .6 && Math.abs(m.x - OB_BTN.x) < OB_BTN.w / 2 + 6 && Math.abs(m.y - OB_BTN.y) < OB_BTN.h / 2 + 6) {
+      if (S.phaseT > 1.1) {
         S.iceShown = true; S.phase = 'play'; S.phaseT = 0; SFX.place(); spawnPiece();
       }
       return;
@@ -755,7 +749,11 @@
     }
     for (const q of particles) {
       q.age += dt;
-      if (q.vx !== undefined) { q.vy += 900 * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.vr) q.rot += q.vr * dt; }
+      if (q.vx !== undefined) {
+        if (q.drag) { const f = Math.pow(.06, dt); q.vx *= f; q.vy = q.vy * f + 120 * dt; }   // shards: burst out, slow down, barely fall
+        else q.vy += 900 * dt;
+        q.x += q.vx * dt; q.y += q.vy * dt; if (q.vr) q.rot += q.vr * dt;
+      }
     }
     particles = particles.filter(q => q.age < q.life);
     for (const f of flyers) {
@@ -838,10 +836,10 @@
         ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.scale(q.s, q.s);
         ctx.drawImage(A[q.sheet], sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh); ctx.restore();
       } else if (q.kind === 'wedge') { drawSlice(q.x, q.y, q.fruit, q.i, 1 - k * .4); }
-      else if (q.kind === 'ring') { ctx.globalAlpha = (1 - k) * .85; ctx.beginPath(); ctx.arc(q.x, q.y, PLATE_R + ease(k) * 60, 0, TAU); ctx.strokeStyle = '#fff'; ctx.lineWidth = 9 * (1 - k); ctx.stroke(); }
+      else if (q.kind === 'ring') { ctx.globalAlpha = (1 - k) * .85; ctx.beginPath(); ctx.arc(q.x, q.y, (q.ice ? 40 : PLATE_R) + ease(k) * 60, 0, TAU); ctx.strokeStyle = q.ice ? '#D6F1FF' : '#fff'; ctx.lineWidth = 9 * (1 - k); ctx.stroke(); }
       else if (q.kind === 'reward') drawReward(q, k);
       else if (q.kind === 'shard') {
-        const im = A[q.img]; ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.scale(q.s, q.s);
+        const im = A[q.img], sk = q.s * (1 - k * .35); ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.scale(sk, sk);
         ctx.drawImage(im, -im.width / 2, -im.height / 2); ctx.restore();
       }
       else if (q.kind === 'float') { ctx.globalAlpha = 1 - k; outlined(q.text, q.x, q.y + ease(k) * 16, 20, q.color, '#7A1512', '#4A0C0A'); }
@@ -914,7 +912,7 @@
       drawBubble(note.text, W / 2, HEARTS.y + 34, { tail: -1, tx: W / 2, alpha: a, pop: back(clamp01(note.age * 4)) });
     }
 
-    if (S.phase === 'obstacle') drawObstacleCard(S.phaseT);
+    if (S.phase === 'obstacle') drawObstacleIntro(S.phaseT);
     // stage banner
     if ((S.phase === 'in' && st.intro) || S.phase === 'clear') {
       const text = S.phase === 'in' ? st.intro : (S.stage === STAGES.length - 1 ? 'Level clear!' : ['Great!', 'Awesome!', 'Perfect!'][S.stage % 3]);
