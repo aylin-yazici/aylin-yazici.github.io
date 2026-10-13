@@ -385,6 +385,24 @@
     ctx.globalAlpha /= .55; ctx.globalCompositeOperation = 'source-over';
     // light catching the inside of the rim
     icePath(runs, R); ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(200,240,255,.55)'; ctx.stroke();
+    // cut-ice facets like the reference block: an irregular face in the middle, edges running out to the rim
+    {
+      const F = [[-2.6, .6], [-1.75, .66], [-.95, .58], [-.2, .64], [.62, .6], [1.45, .66]];   // [angle, radius as share of R]
+      const P = F.map(([a, r]) => [FRUIT_C[0] + Math.cos(a) * R * r, FRUIT_C[1] + Math.sin(a) * R * r]);
+      const E = F.map(([a], i) => { const a2 = a + (i % 2 ? .12 : -.1); return [FRUIT_C[0] + Math.cos(a2) * R * 1.05, FRUIT_C[1] + Math.sin(a2) * R * 1.05]; });
+      // side facets: alternate lighter / cooler so the faces read
+      for (let i = 0; i < 6; i++) {
+        const j = (i + 1) % 6; ctx.beginPath(); ctx.moveTo(...P[i]); ctx.lineTo(...E[i]); ctx.lineTo(...E[j]); ctx.lineTo(...P[j]); ctx.closePath();
+        ctx.fillStyle = i % 2 ? 'rgba(255,255,255,.14)' : 'rgba(40,140,230,.12)'; ctx.fill();
+      }
+      ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath();
+      ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fill();
+      const lines = () => { ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.closePath();
+        P.forEach((p, i) => { ctx.moveTo(...p); ctx.lineTo(...E[i]); }); };
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      lines(); ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.stroke();      // glow
+      lines(); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke();       // crisp line
+    }
     // curved light like a glass dome: crescent along the top-left rim, soft glow inside it, small glint bottom-right
     ctx.save(); ctx.translate(FRUIT_C[0], FRUIT_C[1]);
     const glow = ctx.createRadialGradient(-R * .35, -R * .4, 2, -R * .35, -R * .4, R * .7);
