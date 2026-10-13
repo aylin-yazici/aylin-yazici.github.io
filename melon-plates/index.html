@@ -274,15 +274,15 @@
       hiss({ dur: .01, vol: .12, type: 'lowpass', f0: 1000 });
     },
     nope() { tone({ f0: 220, f1: 150, dur: .1, type: 'triangle', vol: .14 }); tone({ f0: 200, f1: 140, dur: .12, type: 'triangle', vol: .12, delay: .1 }); },
-    splash(combo, fruit) {                              // crunchy, wet burst (lemon is a little brighter)
+    splash(combo, fruit, v = 1) {        // v: overall volume (lower when ice breaks at the same time)                              // crunchy, wet burst (lemon is a little brighter)
       const up = (1 + Math.min(combo, 4) * .06) * (fruit === 'l' ? 1.25 : 1);
-      for (let i = 0; i < 5; i++) hiss({ dur: .025 + Math.random() * .03, vol: .45, delay: i * .014, f0: (2600 + Math.random() * 1800) * up, q: 1.8 });
-      hiss({ dur: .38, vol: .55, type: 'lowpass', f0: 4200 * up, f1: 260, q: 9, delay: .01 });   // squelch
-      hiss({ dur: .22, vol: .2, type: 'bandpass', f0: 900, f1: 400, q: 3, delay: .03 });
-      tone({ f0: 150, f1: 48, dur: .26, vol: .55 });                                               // body thump
+      for (let i = 0; i < 5; i++) hiss({ dur: .025 + Math.random() * .03, vol: v * .45, delay: i * .014, f0: (2600 + Math.random() * 1800) * up, q: 1.8 });
+      hiss({ dur: .38, vol: v * .55, type: 'lowpass', f0: 4200 * up, f1: 260, q: 9, delay: .01 });   // squelch
+      hiss({ dur: .22, vol: v * .2, type: 'bandpass', f0: 900, f1: 400, q: 3, delay: .03 });
+      tone({ f0: 150, f1: 48, dur: .26, vol: v * .55 });                                               // body thump
       for (let i = 0; i < 7; i++) {                                                                  // juice drips
         const f = (420 + Math.random() * 380) * up;
-        tone({ f0: f, f1: f * 2.3, dur: .05, vol: .09, delay: .07 + i * .045 + Math.random() * .03, wet: .45 });
+        tone({ f0: f, f1: f * 2.3, dur: .05, vol: v * .09, delay: .07 + i * .045 + Math.random() * .03, wet: .45 });
       }
     },
     tick(i, combo) { bell(PENTA[Math.min(i + combo, PENTA.length - 1)], .08); },
@@ -385,15 +385,19 @@
     ctx.globalAlpha /= .55; ctx.globalCompositeOperation = 'source-over';
     // light catching the inside of the rim
     icePath(runs, R); ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(200,240,255,.55)'; ctx.stroke();
-    // big glossy highlight top-left, a smaller one bottom-right, diagonal glints
+    // curved light like a glass dome: crescent along the top-left rim, soft glow inside it, small glint bottom-right
     ctx.save(); ctx.translate(FRUIT_C[0], FRUIT_C[1]);
-    const hl = ctx.createRadialGradient(-R * .38, -R * .5, 1, -R * .38, -R * .5, R * .5);
-    hl.addColorStop(0, 'rgba(255,255,255,.95)'); hl.addColorStop(.5, 'rgba(255,255,255,.45)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = hl; ctx.beginPath(); ctx.ellipse(-R * .36, -R * .5, R * .5, R * .2, -.6, 0, TAU); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(R * .45, R * .52, R * .2, R * .07, -.6, 0, TAU); ctx.fill();
-    ctx.rotate(-.75);
-    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(-R, -R * .02, R * 2, 8);
-    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(-R, R * .17, R * 2, 3);
+    const glow = ctx.createRadialGradient(-R * .35, -R * .4, 2, -R * .35, -R * .4, R * .7);
+    glow.addColorStop(0, 'rgba(255,255,255,.5)'); glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+    const crescent = (r1, a1, a2, off, alpha) => {           // area between the rim and a slightly shifted inner arc
+      ctx.beginPath(); ctx.arc(0, 0, r1, a1, a2);
+      ctx.arc(off * Math.cos((a1 + a2) / 2 + Math.PI) * -1, off * Math.sin((a1 + a2) / 2 + Math.PI) * -1, r1 - off * 1.4, a2, a1, true);
+      ctx.closePath(); ctx.fillStyle = `rgba(255,255,255,${alpha})`; ctx.fill();
+    };
+    crescent(R - 4, Math.PI * .95, Math.PI * 1.55, 9, .85);
+    crescent(R - 4, Math.PI * .08, Math.PI * .38, 5, .5);
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.ellipse(-R * .3, -R * .66, R * .09, R * .04, -.5, 0, TAU); ctx.fill();
     ctx.restore();
     ctx.restore();
     // edge: deep blue line with a bright inner highlight
@@ -574,7 +578,7 @@
 
   // ---------- effects ----------
   function explode(p, fruit) {
-    SFX.splash(S.combo, fruit);
+    SFX.splash(S.combo, fruit, neighbours(p).some(q => q.ice) ? .4 : 1);   // quieter when ice breaks too, so the crack stands out
     const fx = FX[fruit];
     const n = reduceMotion ? 8 : 26;
     for (let i = 0; i < n; i++) {
