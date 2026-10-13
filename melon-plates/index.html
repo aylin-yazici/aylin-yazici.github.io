@@ -368,17 +368,37 @@
     for (const [a0, a1] of runs) { ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath(); }
   }
   function drawIce(slots, a = 1, grow = 1) {
-    if (!slots.some(Boolean)) return;
-    const runs = iceRuns(slots), R = (FRUIT_R + 4) * grow;
+    const runs = 'full', R = 61 * grow;                       // a full disc inside the plate rim
     ctx.save(); ctx.globalAlpha *= a; ctx.lineJoin = 'round';
     // top face: the exported ice block, scaled to the fruit circle and cut to the frozen slices
     icePath(runs, R);
     ctx.save(); ctx.clip();
-    // the block's front face (centre 120,150; about 95 by 78 px half-size in the 240px image) lines up with the fruit
+    // clear blue ice: cool tint over the fruit, deeper blue toward the rim for depth
+    ctx.fillStyle = 'rgba(70,170,255,.38)'; ctx.fillRect(-R - 10, -R - 10, R * 2 + 20, R * 2 + 20);
+    const depth = ctx.createRadialGradient(FRUIT_C[0] - R * .2, FRUIT_C[1] - R * .25, R * .2, FRUIT_C[0], FRUIT_C[1], R * 1.05);
+    depth.addColorStop(0, 'rgba(235,250,255,.38)'); depth.addColorStop(.65, 'rgba(120,205,255,.1)'); depth.addColorStop(1, 'rgba(25,110,215,.55)');
+    ctx.fillStyle = depth; ctx.fillRect(-R - 10, -R - 10, R * 2 + 20, R * 2 + 20);
+    // the exported block's facets, added as light
     const sx = R * 1.06 / 95, sy = R * 1.06 / 78;
-    ctx.globalAlpha *= .9; ctx.drawImage(A.iceBlock, FRUIT_C[0] - 120 * sx, FRUIT_C[1] - 150 * sy, 240 * sx, 240 * sy); ctx.globalAlpha /= .9;
+    ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha *= .55;
+    ctx.drawImage(A.iceBlock, FRUIT_C[0] - 120 * sx, FRUIT_C[1] - 150 * sy, 240 * sx, 240 * sy);
+    ctx.globalAlpha /= .55; ctx.globalCompositeOperation = 'source-over';
+    // light catching the inside of the rim
+    icePath(runs, R); ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(200,240,255,.55)'; ctx.stroke();
+    // big glossy highlight top-left, a smaller one bottom-right, diagonal glints
+    ctx.save(); ctx.translate(FRUIT_C[0], FRUIT_C[1]);
+    const hl = ctx.createRadialGradient(-R * .38, -R * .5, 1, -R * .38, -R * .5, R * .5);
+    hl.addColorStop(0, 'rgba(255,255,255,.95)'); hl.addColorStop(.5, 'rgba(255,255,255,.45)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hl; ctx.beginPath(); ctx.ellipse(-R * .36, -R * .5, R * .5, R * .2, -.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.ellipse(R * .45, R * .52, R * .2, R * .07, -.6, 0, TAU); ctx.fill();
+    ctx.rotate(-.75);
+    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(-R, -R * .02, R * 2, 8);
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(-R, R * .17, R * 2, 3);
     ctx.restore();
-    icePath(runs, R); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(95,170,230,.9)'; ctx.stroke();
+    ctx.restore();
+    // edge: deep blue line with a bright inner highlight
+    icePath(runs, R); ctx.lineJoin = 'round'; ctx.lineWidth = 3.5; ctx.strokeStyle = '#2E8DE0'; ctx.stroke();
+    icePath(runs, R - 2.5); ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke();
     // twinkle
     const tw = Math.sin(t * 2.4);
     if (tw > .3) star(FRUIT_C[0] - R * .38, FRUIT_C[1] - R * .48, 2.5 + (tw - .3) * 9, t, '#FFFFFF');
@@ -400,12 +420,7 @@
       const g = ctx.createRadialGradient(0, 0, 20, 0, 0, 175); g.addColorStop(0, 'rgba(150,215,255,.45)'); g.addColorStop(1, 'rgba(150,215,255,0)'); ctx.fillStyle = g;
       for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 175, i * TAU / 12, i * TAU / 12 + TAU / 28); ctx.closePath(); ctx.fill(); }
       ctx.restore();
-      const S2 = 150;
-      ctx.beginPath(); ctx.roundRect(-S2 / 2 - 6, -S2 / 2 - 6 + 6, S2 + 12, S2 + 12, 24); ctx.fillStyle = '#0B3C9E'; ctx.fill();
-      ctx.beginPath(); ctx.roundRect(-S2 / 2 - 6, -S2 / 2 - 6, S2 + 12, S2 + 12, 24); ctx.fillStyle = '#7CC4FF'; ctx.fill();
-      const tg = ctx.createLinearGradient(0, -S2 / 2, 0, S2 / 2); tg.addColorStop(0, '#2F7BEA'); tg.addColorStop(1, '#1A4FBF');
-      ctx.beginPath(); ctx.roundRect(-S2 / 2, -S2 / 2, S2, S2, 18); ctx.fillStyle = tg; ctx.fill();
-      ctx.save(); ctx.scale(.95, .95);
+      ctx.save(); ctx.scale(1.25, 1.25);
       const demo = [1, 1, 1, 0, 1, 1].map(Boolean);
       ctx.drawImage(A.plate, -MC[0], -MC[1]); demo.forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawIce(demo);
       ctx.restore();
