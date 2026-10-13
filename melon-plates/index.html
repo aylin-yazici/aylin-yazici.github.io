@@ -100,15 +100,12 @@
   // Plate lists follow LAYOUT order. Scripted pieces teach one idea at a time; `hint` is the plate the hand points at.
   const E = [0,0,0,0,0,0];
   const STAGES = [
-    { n: 3, board: TUTORIAL_BOARD, goals: { m: 12 }, safe: true, hideLives: true, hintDelay: .5, pFit: 1, intro: 'Let\u2019s play!',
+    // tutorial board (Figma 'Tutorial' frames 1-5): scripted first plate, then lives are introduced on the same board
+    { n: 3, board: TUTORIAL_BOARD, goals: { m: 30 }, hideLives: true, livesAfterFirst: true, hintDelay: .5, laterHint: 3, pFit: 1, intro: 'Let\u2019s play!',
       pre: [[null,E], [null,E], [null,E]],
-      script: [{ fruit:'m', start:0, size:2, hint:0, spot: true, tip: 'Tap a plate to put the slices on it' },
-               { fruit:'m', start:3, size:3, hint:0, spot: true, tip: 'Fill all 6 spots to serve fruit!' },
-               { fruit:'m', start:2, size:1, hint:0, spot: true, tip: 'Fill all 6 spots to serve fruit!' }] },
-    { n: 4, goals: { m: 12 }, hintDelay: 2.5, pFit: 1, livesIntro: true, intro: 'Nice!',
-      pre: [['m',[1,1,0,0,0,1]], ['m',[0,0,1,1,1,0]], ['m',[0,0,0,1,0,0]], ['m',[0,0,1,0,0,0]]],
-      script: [{ fruit:'m', start:2, size:3, hint:0, tip: 'Pick a plate with room for the slices' },
-               { fruit:'m', start:5, size:3, hint:1 }] },
+      script: [{ fruit:'m', start:0, size:2, hint:0, spot: true, hand: [32, 10], bx: 201, tip: 'Tap a plate to put the\nslices on it!' },
+               { fruit:'m', start:3, size:3, hint:0, spot: true, hand: [6, 24], tip: 'Fill all 6 spots to serve\nfruit!' },
+               { fruit:'m', start:2, size:1, hint:0, spot: true, hand: [6, 24], tip: 'Fill all 6 spots to serve\nfruit!' }] },
     { n: 4, goals: { m: 6, l: 12 }, hintDelay: 1.5, pFit: 1, newFruit: 'l', intro: 'New fruit unlocked!',
       pre: [['m',[1,1,1,0,0,0]], ['l',[1,1,1,1,0,0]], ['l',[0,0,1,1,1,0]], [null,E]],
       script: [{ fruit:'l', start:4, size:2, hint:1, tip: 'Lemons and watermelons can\u2019t share a plate' },
@@ -193,7 +190,7 @@
     const st = cfg();
     while (S.script < st.script.length) {                   // tutorial pieces, skipped if the board no longer allows them
       const sp = st.script[S.script++];
-      const pc = { fruit: sp.fruit, start: sp.start, size: sp.size, hint: sp.hint, tip: sp.tip, spot: sp.spot, demoWrong: sp.demoWrong };
+      const pc = { fruit: sp.fruit, start: sp.start, size: sp.size, hint: sp.hint, tip: sp.tip, spot: sp.spot, demoWrong: sp.demoWrong, hand: sp.hand, bx: sp.bx };
       if (anyFit(pc)) return pc;
     }
     const fr = fruitsOf(st).filter(f => S.left[f] > 0);
@@ -480,7 +477,15 @@
     for (const [s2, c] of parts) { ctx.fillStyle = c; ctx.fillText(s2, cx, y); cx += ctx.measureText(s2).width; }
     ctx.textAlign = 'center';
   }
-  function drawBackground() { ctx.drawImage(A.bg, 0, 0, W, W * A.bg.height / A.bg.width); }
+  function drawBackground() {
+    ctx.drawImage(A.bg, 0, 0, W, W * A.bg.height / A.bg.width);
+    let g = ctx.createLinearGradient(0, 0, 0, 80);                     // Figma 'top gradient'
+    g.addColorStop(0, 'rgba(5,68,150,.76)'); g.addColorStop(.876, 'rgba(26,57,119,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, 80);
+    g = ctx.createLinearGradient(0, 805, 0, 874);                       // Figma 'bottom gradient'
+    g.addColorStop(.067, 'rgba(3,163,202,0)'); g.addColorStop(1, 'rgba(0,87,188,.79)');
+    ctx.fillStyle = g; ctx.fillRect(0, 805, W, 69);
+  }
   function drawCheck(x, y) {
     ctx.beginPath(); ctx.arc(x, y, 11, 0, TAU); ctx.fillStyle = '#43C94B'; ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.stroke();
@@ -531,7 +536,7 @@
       ctx.save(); ctx.translate(x, GOAL_ICON_Y); ctx.scale(s, s); ctx.drawImage(im, -im.width / 2, -im.height / 2); ctx.restore();
       if (S.left[f] === 0) { drawCheck(x, GOAL_NUM_Y); continue; }
       ctx.save(); ctx.translate(x, GOAL_NUM_Y); ctx.scale(s, s);
-      ctx.font = '900 23px "Goldplay", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '900 18px "Goldplay", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; if ('letterSpacing' in ctx) ctx.letterSpacing = '-0.9px';
       ctx.lineJoin = 'round'; ctx.lineWidth = 5; ctx.strokeStyle = BLUE; ctx.strokeText(String(S.left[f]), 0, 1);
       ctx.fillStyle = '#fff'; ctx.fillText(String(S.left[f]), 0, 1);
       ctx.restore();
@@ -640,6 +645,7 @@
 
   // ---------- effects ----------
   function explode(p, fruit) {
+    S.served = (S.served || 0) + 1;
     SFX.splash(S.combo, fruit, neighbours(p).some(q => q.ice) ? .4 : 1);   // quieter when ice breaks too, so the crack stands out
     const fx = FX[fruit];
     const n = reduceMotion ? 8 : 26;
@@ -667,7 +673,7 @@
     for (let i = 0; i < 6; i++) flyers.push({ kind: 'slice', fruit, i, x0: p.x, y0: p.y, t: -.12 - i * .05, dur: .42, combo: S.combo });
     if (combo && S.livesShown && !S.comboTaught) {             // explain the first combo the player makes
       S.comboTaught = true;
-      note = { text: 'Combo! A full plate back to back gives you a life.', age: -.9, hold: true, spot: true };
+      note = { text: 'Combo! A full plate\nback to back gives you\na life.', age: -.9, hold: true, spot: true };
     }
     // a combo (two full plates from back-to-back placements) earns a life
     if (combo && S.lives + flyers.filter(f => f.kind === 'heart').length < MAX_LIVES) {
@@ -695,7 +701,7 @@
     const [x, y] = heartPos(S.lives);
     particles.push({ kind: 'float', text: '-1', x: x + 6, y: y + 16, life: 1.4, age: 0, color: '#FF5A4E', small: true });
     if (S.livesShown && !S.wrongTaught && S.lives > 0) {      // only the first wrong tap explains it
-      S.wrongTaught = true; note = { text: 'Ouch! A wrong plate costs you a life.', age: 0, hold: true, spot: true };
+      S.wrongTaught = true; note = { text: 'Ouch! A wrong plate\ncosts you a life.', age: 0, hold: true, spot: true };
     }
     if (S.lives === 0) endStage('lives');
   }
@@ -787,7 +793,7 @@
       SFX.lift();
     } else {
       p.shake = 1; S.combo = 0;
-      if (cfg().safe) SFX.nope(); else loseLife();
+      if (!S.livesShown) SFX.nope(); else loseLife();
     }
   });
   function land(f) {
@@ -874,6 +880,8 @@
       }
     } else if (S.phase === 'lives') {
       if (S.phaseT > .3 && S.phaseT < 1.2 && Math.floor((S.phaseT - .25) / .09) !== Math.floor((S.phaseT - .25 - dt) / .09)) tone({ f0: 500 + S.phaseT * 400, dur: .08, vol: .06 });
+    } else if (S.phase === 'play' && st.livesAfterFirst && !S.livesShown && S.served > 0 && !flyers.length && !fly && !S.plates.some(p => p.pop)) {
+      S.livesShown = true; S.phase = 'lives'; S.phaseT = 0; SFX.life();
     } else if (S.phase === 'play') {
       if (fruitsOf(st).every(f => S.left[f] === 0) && !flyers.length && !fly && !S.plates.some(p => p.pop) && !note) {
         S.phase = 'clear'; S.phaseT = 0; S.piece = null; SFX.banner();
@@ -962,7 +970,7 @@
     }
 
     // hand: shows the plate to tap (tutorial right away, later only after a pause)
-    if (S.phase === 'play' && S.piece && S.pieceIn >= 1 && !fly && idle > st.hintDelay && !S.piece.spot && !S.piece.demoWrong && !(note && note.hold)) {
+    if (S.phase === 'play' && S.piece && S.pieceIn >= 1 && !fly && idle > hintDelayOf(st) && !S.piece.spot && !S.piece.demoWrong && !(note && note.hold)) {
       const tgt = hintPlate(S.piece);
       if (tgt) drawHintHand(tgt, st);
     }
@@ -977,21 +985,20 @@
         ctx.drawImage(A.gen, GEN.x - MC[0], GEN.y - MC[1]);
         ctx.save(); ctx.translate(GEN.x, GEN.y); drawPiece(S.piece, 0, 0); ctx.restore();
       }
-      drawBubble(S.piece.tip, 205, 595, { alpha: a, pop: back(clamp01(S.pieceIn * 1.5)) });
-      if ((S.piece.spot || S.piece.demoWrong) && tgt && idle > st.hintDelay) drawHintHand(tgt, st);
+      drawBubble(S.piece.tip, S.piece.bx || 205, 595, { alpha: a, pop: back(clamp01(S.pieceIn * 1.5)) });
+      if ((S.piece.spot || S.piece.demoWrong) && tgt && idle > hintDelayOf(st)) drawHintHand(tgt, st);
     }
     // lives introduction: dim everything but the hearts
     if (S.phase === 'lives') {
       const a = clamp01(S.phaseT * 3);
-      spotlight([{ x: 103, y: 141, w: 196, h: 48, rr: 24 }], a);
+      spotlight([{ x: 95, y: 138, w: 215, h: 56, rr: 33 }], a);
       drawBarLit(); drawHearts();
-      drawBubble('These are your lives. You have ' + MAX_LIVES + '.', 205, 229, { alpha: clamp01((S.phaseT - .5) * 3), pop: back(clamp01((S.phaseT - .5) * 3)) });
-      if (S.phaseT > 1.1) { ctx.save(); ctx.globalAlpha = .6 + .4 * Math.sin(t * 5); outlined('Tap to continue', W / 2, 690, 20, '#fff'); ctx.restore(); }
+      drawBubble('There are your lives.\nYou have ' + MAX_LIVES + '.', 205, 229, { alpha: clamp01((S.phaseT - .5) * 3), pop: back(clamp01((S.phaseT - .5) * 3)) });
     }
     if (note && note.age > 0 && S.phase !== 'lives') {
       const end = note.hold ? 3.6 : 3.2, a = Math.min(1, note.age * 5, (end - note.age) * 3);
       if (note.spot) {
-        spotlight([{ x: 103, y: 141, w: 196, h: 48, rr: 24 }], a);
+        spotlight([{ x: 95, y: 138, w: 215, h: 56, rr: 33 }], a);
         drawBarLit(); drawHearts();
       }
       drawBubble(note.text, 205, 229, { alpha: a, pop: back(clamp01(note.age * 4)) });
@@ -1024,15 +1031,18 @@
     }
   }
   function drawHintHand(tgt, st) {
-    const c = ((idle - st.hintDelay) % 1.3) / 1.3, appear = clamp01((idle - st.hintDelay) * 4);
+    const hd = hintDelayOf(st), c = ((idle - hd) % 1.3) / 1.3, appear = clamp01((idle - hd) * 4);
     if (fits(tgt, S.piece)) drawPiece(S.piece, tgt.x, tgt.y, 1, (.3 + .2 * Math.sin(c * TAU)) * appear);
-    let hx = tgt.x + 34, hy = tgt.y + 14, press = 0;
+    const ho = (S.piece && S.piece.hand) || [32, 10];
+    let hx = tgt.x + ho[0], hy = tgt.y + ho[1], press = 0;
     if (c < .35) { const k = ease(c / .35); hx += (1 - k) * 34; hy += (1 - k) * 34; }
     else if (c < .6) press = (c - .35) / .25;
     else { const k = (c - .6) / .4; hx += easeIn(k) * 34; hy += easeIn(k) * 34; }
     drawHand(hx, hy, press, appear);
   }
+  const hintDelayOf = st => (S.script >= st.script.length && st.laterHint) || st.hintDelay;
   function wrap(text, maxW) {
+    if (text.includes('\n')) return text.split('\n');      // scripted texts break where the Figma frames break
     const words = text.split(' '), lines = []; let line = '';
     for (const w of words) { const tryL = line ? line + ' ' + w : w; if (ctx.measureText(tryL).width > maxW && line) { lines.push(line); line = w; } else line = tryL; }
     lines.push(line); return lines;
