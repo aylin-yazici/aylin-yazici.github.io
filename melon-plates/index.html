@@ -763,7 +763,7 @@
       if (MENU_PLUS.some(([x, y]) => near(m, x, y, 18))) { SFX.lock(); return showToast('The shop opens in the full game'); }
       if (MENU_ICONS.some(([x, y]) => near(m, x, y, 40))) { SFX.lock(); return showToast('Coming soon'); }
       if (MB.phase !== 'idle') {                            // tapping during the bus change skips it
-        if (MB.nextScene) MB.scene = MB.nextScene; MB.skin = MB.nextSkin; MB.phase = 'idle'; MB.shown = progress; MB.envMix = 1; MB.btnPop = 1; return;
+        skipDrive(); return;
       }
       if (m.x > LEVEL_BTN.x && m.x < LEVEL_BTN.x + LEVEL_BTN.w && m.y > LEVEL_BTN.y && m.y < LEVEL_BTN.y + LEVEL_BTN.h && !btnPress) {
         btnPress = 1; SFX.place(); SFX.start();
@@ -926,29 +926,7 @@
   const sAt = y => { const f = Math.max(0, Math.min(DASH_S.length - 1.001, y - CREST)), i = Math.floor(f); return DASH_S[i] + (DASH_S[i + 1] - DASH_S[i]) * (f - i); };
   const yAt = s => { let lo = CREST, hi = 1000; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (sAt(m) < s) lo = m; else hi = m; } return (lo + hi) / 2; };
   const DASH_PHASE = sAt(684) % 1;                         // a dash starts at y 684 in the painting
-  // bus colours: the painted teal is recoloured at load (window, lights and roof keep their colours)
-  const BUS_HUES = [null, 4, 46, 268, 208, 24, 326, 120];
-  const busSkins = [];
-  function makeBusSkins() {
-    const im = A.bus, c0 = document.createElement('canvas'); c0.width = im.width; c0.height = im.height;
-    const x0 = c0.getContext('2d'); x0.drawImage(im, 0, 0);
-    let src; try { src = x0.getImageData(0, 0, c0.width, c0.height); } catch (e) { busSkins.push(im); return; }
-    for (const hue of BUS_HUES) {
-      if (hue === null) { busSkins.push(c0); continue; }
-      const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
-      const id = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height), d = id.data;
-      for (let k = 0; k < d.length; k += 4) {
-        const r = d[k] / 255, g = d[k + 1] / 255, b = d[k + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, dl = mx - mn;
-        if (dl < .12) continue;
-        let h = mx === r ? ((g - b) / dl) % 6 : mx === g ? (b - r) / dl + 2 : (r - g) / dl + 4; h = (h * 60 + 360) % 360;
-        if (h < 140 || h > 192) continue;                   // only the teal paint
-        const s = dl / (1 - Math.abs(2 * l - 1)), C = (1 - Math.abs(2 * l - 1)) * s, X = C * (1 - Math.abs((hue / 60) % 2 - 1)), m = l - C / 2;
-        const [r1, g1, b1] = hue < 60 ? [C, X, 0] : hue < 120 ? [X, C, 0] : hue < 180 ? [0, C, X] : hue < 240 ? [0, X, C] : hue < 300 ? [X, 0, C] : [C, 0, X];
-        d[k] = (r1 + m) * 255; d[k + 1] = (g1 + m) * 255; d[k + 2] = (b1 + m) * 255;
-      }
-      c.getContext('2d').putImageData(id, 0, 0); busSkins.push(c);
-    }
-  }
+  function makeBusSkins() {}                                // the bus keeps its painted colours
   // scenery that changes a little each level: light of the day, clouds, a balloon now and then
   const SKY_TINTS = [null, ['255,190,150', .16], ['255,240,170', .1], ['200,180,255', .14], ['255,210,120', .18], ['170,220,255', .12]];
   function sceneFor(level) {
@@ -959,48 +937,40 @@
   let progress = 1;
   try { if (/[?&]reset\b/.test(location.search)) localStorage.removeItem('mp-level'); progress = Math.max(1, parseInt(localStorage.getItem('mp-level'), 10) || 1); } catch (e) {}
   const saveProgress = () => { try { localStorage.setItem('mp-level', String(progress)); } catch (e) {} };
-  // MB: menu bus state. phase idle | rev | away | sink | gap | in
-  const MB = { phase: 'idle', t: 0, level: progress, shown: progress, skin: 0, nextSkin: 0, scene: null, nextScene: null, envMix: 1, puffT: 0, btnPop: 0, birds: null, birdT: 0 };
-  const puffs = [];
-  MB.scene = sceneFor(progress); MB.skin = (progress - 1) % BUS_HUES.length;
-  function menuDrive() {                                    // after a level win: this bus leaves, the next one arrives
-    MB.phase = 'rev'; MB.t = 0; MB.nextScene = sceneFor(progress); MB.nextSkin = (progress - 1) % BUS_HUES.length; MB.envMix = 0;
-  }
-  function busPose() {                                      // bottom-centre y, scale, clip and squash for the current phase
-    const ease = x => 1 - Math.pow(1 - x, 3);
-    if (MB.phase === 'rev') return { y: PARK_Y, k: 1, sq: 1 - Math.sin(Math.min(1, MB.t / .35) * Math.PI) * .03 };
-    if (MB.phase === 'away') { const s0 = sAt(PARK_Y), u = Math.min(1, MB.t / 1.25), s = s0 * (1 - u * u); const y = yAt(s); return { y, k: roadW(y) / PARK_W, sq: 1 }; }
-    if (MB.phase === 'sink') { const k = roadW(CREST) / PARK_W * (1 - MB.t * .25); return { y: CREST + BUS_SPRITE.h * k * Math.min(1, MB.t / .45) * 1.05, k, clip: CREST, sq: 1 }; }
-    if (MB.phase === 'gap') return null;
-    if (MB.phase === 'in') { const s0 = sAt(PARK_Y), s1 = sAt(960), u = ease(Math.min(1, MB.t / 1.15)), s = s1 + (s0 - s1) * u, y = yAt(s);
-      return { y, k: roadW(y) / PARK_W, sq: u > .92 ? 1 - Math.sin((u - .92) / .08 * Math.PI) * .025 : 1 }; }
-    return { y: PARK_Y, k: 1, sq: 1 + Math.sin(t * 9) * .004 };
+  // MB: menu bus state. phase idle | rev | drive | swap | arrive
+  // The bus stays parked and the camera follows it: the painting pushes in toward the town while the road dashes stream
+  // under the bus, the next stop dissolves in, and the road slows to a stop.
+  const MB = { phase: 'idle', t: 0, shown: progress, scene: null, nextScene: null, mix: 1, zoom: 1, dash: 0, speed: 0, puffT: 0, btnPop: 0, birds: null, birdT: 0 };
+  const puffs = [], FOCUS = [201, 380];
+  MB.scene = sceneFor(progress);
+  function menuDrive() { MB.phase = 'rev'; MB.t = 0; MB.nextScene = sceneFor(progress); MB.mix = 0; }
+  function skipDrive() { if (MB.nextScene) MB.scene = MB.nextScene; Object.assign(MB, { phase: 'idle', shown: progress, mix: 1, zoom: 1, speed: 0, btnPop: 1 }); }
+  function busPose() {                                      // bottom-centre y and squash; the bus never leaves its spot
+    if (MB.phase === 'rev') return { y: PARK_Y, k: 1, sq: 1 - Math.sin(Math.min(1, MB.t / .45) * Math.PI) * .025 };
+    if (MB.phase === 'drive' || MB.phase === 'swap') return { y: PARK_Y - 2 * Math.min(1, MB.speed / 3.2), k: 1, sq: 1 };
+    if (MB.phase === 'arrive') { const u = Math.min(1, MB.t / .9); return { y: PARK_Y - 2 * (1 - u), k: 1, sq: u > .8 ? 1 - Math.sin((u - .8) / .2 * Math.PI) * .02 : 1 }; }
+    return { y: PARK_Y, k: 1, sq: 1 + Math.sin(t * 4) * .002 };
   }
   function updateMenu(dt) {
     MB.t += dt; MB.btnPop = Math.max(0, MB.btnPop - dt * 2.5);
-    const next = (ph) => { MB.phase = ph; MB.t = 0; };
-    if (MB.phase === 'rev' && MB.t > .4) { next('away'); SFX.whoosh(false); }
-    else if (MB.phase === 'away' && MB.t > 1.25) next('sink');
-    else if (MB.phase === 'sink' && MB.t > .45) { next('gap'); MB.skin = MB.nextSkin; }
-    else if (MB.phase === 'gap') { MB.envMix = Math.min(1, MB.t / .4); if (MB.t > .4) { MB.scene = MB.nextScene; MB.envMix = 1; next('in'); SFX.whoosh(true); } }
-    else if (MB.phase === 'in' && MB.t > 1.15) { next('idle'); MB.shown = progress; MB.btnPop = 1; SFX.horn(); for (let i = 0; i < 5; i++) addPuff(1.4); }
-    // exhaust
-    const pose = busPose();
-    if (pose && !pose.clip) {
-      const every = MB.phase === 'idle' ? .5 : MB.phase === 'rev' ? .06 : .12;
-      if ((MB.puffT -= dt) <= 0) { MB.puffT = every * (.7 + Math.random() * .6); addPuff(MB.phase === 'rev' ? 1.3 : 1); }
-    }
-    for (const q of puffs) { q.age += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= .97; q.vy *= .97; }
+    const next = ph => { MB.phase = ph; MB.t = 0; }, smooth = x => x * x * (3 - 2 * x);
+    if (MB.phase === 'rev') { MB.speed = 0; if (MB.t > .45) { next('drive'); SFX.whoosh(false); } }
+    else if (MB.phase === 'drive') { const u = Math.min(1, MB.t / 1.6); MB.speed = 3.2 * Math.min(1, MB.t / .7); MB.zoom = 1 + .3 * u * u; if (MB.t > 1.6) next('swap'); }
+    else if (MB.phase === 'swap') { const u = Math.min(1, MB.t / .38); MB.zoom = 1.3 + .14 * u; MB.mix = smooth(u); if (MB.t > .38) { MB.scene = MB.nextScene; MB.mix = 1; MB.zoom = 1; next('arrive'); } }
+    else if (MB.phase === 'arrive') { const u = Math.min(1, MB.t / .9); MB.speed = 3.2 * (1 - u) * (1 - u); if (MB.t > .9) { next('idle'); MB.speed = 0; MB.shown = progress; MB.btnPop = 1; SFX.horn(); for (let i = 0; i < 4; i++) addPuff(1.3); } }
+    MB.dash += MB.speed * dt;
+    // exhaust: gentle at idle, thick when revving, streaming back with the road while driving
+    const every = MB.phase === 'idle' ? .55 : MB.phase === 'rev' ? .07 : .14;
+    if ((MB.puffT -= dt) <= 0) { MB.puffT = every * (.7 + Math.random() * .6); addPuff(MB.phase === 'rev' ? 1.3 : 1); }
+    for (const q of puffs) { q.age += dt; q.x += q.vx * dt; q.y += (q.vy + MB.speed * 90) * dt; q.vx *= .97; q.vy *= .97; }
     for (let i = puffs.length - 1; i >= 0; i--) if (puffs[i].age > puffs[i].life) puffs.splice(i, 1);
     for (const c of MB.scene.clouds) c.x = (c.x + c.v * dt + 40) % 480 - 40;
-    // a few birds cross the sky now and then
     if (!MB.birds && (MB.birdT += dt) > MB.scene.birdsAt) { MB.birdT = -6 - Math.random() * 6; const dir = Math.random() < .5 ? 1 : -1; MB.birds = { x: dir > 0 ? -40 : 440, y: 70 + Math.random() * 120, dir, t: 0 }; }
     if (MB.birds && ((MB.birds.t += dt), (MB.birds.x += MB.birds.dir * 46 * dt), MB.birds.x < -60 || MB.birds.x > 460)) MB.birds = null;
   }
   function addPuff(power) {
-    const p = busPose(); if (!p) return;
-    const x = BUS_X + BUS_SPRITE.pipe[0] * p.k, y = p.y + BUS_SPRITE.pipe[1] * p.k;
-    puffs.push({ x, y, vx: 6 + Math.random() * 14, vy: (16 + Math.random() * 20) * power * (MB.phase === 'away' ? 2 : 1), r: (2.4 + Math.random() * 1.5) * p.k, grow: (7 + Math.random() * 5) * p.k * power, age: 0, life: .9 + Math.random() * .5 });
+    const p = busPose();
+    puffs.push({ x: BUS_X + BUS_SPRITE.pipe[0], y: p.y + BUS_SPRITE.pipe[1], vx: 6 + Math.random() * 14, vy: (16 + Math.random() * 20) * power, r: 2.4 + Math.random() * 1.5, grow: (7 + Math.random() * 5) * power, age: 0, life: .9 + Math.random() * .5 });
   }
   function drawCloud(c, a) {
     ctx.save(); ctx.globalAlpha = a * .9; ctx.translate(c.x, c.y); ctx.scale(c.s, c.s);
@@ -1036,42 +1006,35 @@
     if (sc.balloon) drawBalloon(sc.balloon, a);
     for (const c of sc.clouds) drawCloud(c, a);
   }
-  function drawDashes() {
+  function drawDashes(offset) {
     for (let y = CREST + 1; y < H; y++) {
-      if (((sAt(y) - DASH_PHASE) % 1 + 1) % 1 > .406) continue;
+      if (((sAt(y) - DASH_PHASE - offset) % 1 + 1) % 1 > .406) continue;
       const w = roadW(y) * .063, k = (y - CREST) / (H - CREST);
       ctx.fillStyle = `rgb(254,${Math.round(244 - 18 * k)},${Math.round(207 - 25 * k)})`;
       ctx.fillRect(ROAD_CX - w / 2, y, w, 1.02);
     }
   }
-  function roadClip() {                                       // the visible road surface, for the bus shadow
-    ctx.beginPath(); ctx.moveTo(roadL(CREST), CREST);
-    for (let y = CREST; y <= H; y += 20) ctx.lineTo(roadL(y) - 4, y);
-    for (let y = H; y >= CREST; y -= 20) ctx.lineTo(roadR(y) + 4, y);
-    ctx.closePath(); ctx.clip();
+  function drawWorld(sc, zoom, alpha) {                     // the painted scene, pushed in toward the town by zoom
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.translate(FOCUS[0], FOCUS[1]); ctx.scale(zoom, zoom); ctx.translate(-FOCUS[0], -FOCUS[1]);
+    ctx.drawImage(A.menuBg, 0, 0, W, W * A.menuBg.height / A.menuBg.width);
+    drawDashes(MB.dash);
+    drawSceneExtras(sc, alpha);
+    ctx.restore();
   }
   function drawBus(p) {
-    if (!p) return;
-    const skin = busSkins[MB.skin] || A.bus, rum = MB.phase === 'idle' || MB.phase === 'rev' ? Math.sin(t * 55) * .35 + Math.sin(t * 13) * .25 : 0;
-    const bx = BUS_X + (ROAD_CX - BUS_X) * (1 - p.k), by = p.y + rum;
-    if (!p.clip) {                                            // soft shadow on the road (light from the upper left)
-      ctx.save(); roadClip(); ctx.translate(bx, by); ctx.scale(p.k, p.k);
-      ctx.fillStyle = 'rgba(70,40,20,.2)'; ctx.beginPath(); ctx.roundRect(-40, -196, 102, 202, 26); ctx.fill();
-      ctx.fillStyle = 'rgba(70,40,20,.16)'; ctx.beginPath(); ctx.ellipse(2, 3, 54, 8, 0, 0, TAU); ctx.fill();
-      ctx.restore();
-    }
-    ctx.save();
-    if (p.clip) { ctx.beginPath(); ctx.rect(0, 0, W, p.clip); ctx.clip(); }
-    ctx.translate(bx, by); ctx.scale(p.k, p.k * p.sq);
-    ctx.drawImage(skin, BUS_SPRITE.dx, BUS_SPRITE.dy, BUS_SPRITE.w, BUS_SPRITE.h);
+    const rum = MB.phase === 'idle' ? Math.sin(t * 20) * .12 : 0;
+    ctx.save(); ctx.translate(BUS_X, p.y + rum);
+    ctx.fillStyle = 'rgba(70,40,20,.2)'; ctx.beginPath(); ctx.roundRect(-40, -196, 102, 202, 26); ctx.fill();     // shadow, light from the upper left
+    ctx.fillStyle = 'rgba(70,40,20,.16)'; ctx.beginPath(); ctx.ellipse(2, 3, 54, 8, 0, 0, TAU); ctx.fill();
+    ctx.scale(1, p.sq);
+    ctx.drawImage(A.bus, BUS_SPRITE.dx, BUS_SPRITE.dy, BUS_SPRITE.w, BUS_SPRITE.h);
     ctx.restore();
   }
   function renderMenu() {
-    ctx.drawImage(A.menuBg, 0, 0, W, W * A.menuBg.height / A.menuBg.width);
-    drawSceneExtras(MB.scene, MB.phase === 'gap' ? 1 - MB.envMix : 1);
-    if (MB.phase === 'gap') drawSceneExtras(MB.nextScene, MB.envMix);
+    drawWorld(MB.scene, MB.zoom, 1);
+    if (MB.phase === 'swap') drawWorld(MB.nextScene, 1, MB.mix);
     if (MB.birds) drawBirds(MB.birds);
-    drawDashes();
     for (const q of puffs) {                                  // little cloud of three blobs, growing and fading
       const k = q.age / q.life, r = q.r + q.grow * k; ctx.globalAlpha = .55 * (1 - k) * Math.min(1, q.age * 8); ctx.fillStyle = '#F7F3EC';
       ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, TAU); ctx.arc(q.x + r * .8, q.y - r * .25, r * .75, 0, TAU); ctx.arc(q.x - r * .6, q.y + r * .35, r * .65, 0, TAU); ctx.fill();
