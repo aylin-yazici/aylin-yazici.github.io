@@ -184,7 +184,7 @@
     if (!st.hideLives && !st.livesIntro) S.livesShown = true;
     Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0,
                        piece: null, pieceIn: 0, phase: 'in', phaseT: 0 });
-    if ((st.iceIntro || S.obstacleTest) && !S.iceShown) { S.phase = 'obstacle'; SFX.banner(); }   // the obstacle intro comes before the board
+    if ((st.iceIntro || S.obstacleTest) && !S.iceShown) { S.phase = 'obstacle'; SFX.obstacle(); }   // the obstacle intro comes before the board
     fly = null; flyers = []; idle = 0;
     SFX.whoosh(true);
   }
@@ -278,6 +278,34 @@
     tone({ f0: f, dur: .5, vol, delay, wet: .35 });
     tone({ f0: f * 2.76, dur: .18, vol: vol * .25, delay, wet: .35 });
   };
+  // engine: noise through a low-pass filter with a fast tremolo (the "brrrr"), plus a soft low hum
+  function rumble({ dur = 1, vol = .12, delay = 0, f0 = 300, f1 = f0, rate0 = 18, rate1 = rate0, attack = .15, release = .4, swell = 1 }) {
+    const a = audio(); if (!a) return;
+    const n = a.currentTime + delay, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(), trem = a.createGain(), lfo = a.createOscillator(), depth = a.createGain();
+    s.buffer = noiseBuf; s.loop = true;
+    f.type = 'lowpass'; f.Q.value = 2.5; f.frequency.setValueAtTime(f0, n); f.frequency.exponentialRampToValueAtTime(f1, n + dur);
+    lfo.frequency.setValueAtTime(rate0, n); lfo.frequency.linearRampToValueAtTime(rate1, n + dur); depth.gain.value = .45; trem.gain.value = .55;
+    lfo.connect(depth).connect(trem.gain);
+    g.gain.setValueAtTime(.0001, n); g.gain.exponentialRampToValueAtTime(vol * (swell < 1 ? swell : 1), n + attack);
+    g.gain.exponentialRampToValueAtTime(vol, n + dur - release); g.gain.exponentialRampToValueAtTime(.0001, n + dur);
+    const hum = a.createOscillator(), hg = a.createGain(); hum.type = 'sine'; hum.frequency.setValueAtTime(f0 * .35, n); hum.frequency.exponentialRampToValueAtTime(f1 * .35, n + dur);
+    hg.gain.value = .5; hum.connect(hg).connect(trem);
+    s.connect(f).connect(trem).connect(g); route(g, .15);
+    s.start(n, Math.random() * .5); lfo.start(n); hum.start(n); s.stop(n + dur + .05); lfo.stop(n + dur + .05); hum.stop(n + dur + .05);
+  }
+  // a warm two-note car horn: saw waves through a low-pass filter, a little vibrato, round attack
+  function honk(delay, len, vol = .045) {
+    const a = audio(); if (!a) return;
+    const n = a.currentTime + delay, f = a.createBiquadFilter(), g = a.createGain();
+    f.type = 'lowpass'; f.frequency.value = 1100; f.Q.value = .8;
+    g.gain.setValueAtTime(.0001, n); g.gain.exponentialRampToValueAtTime(vol, n + .025); g.gain.setValueAtTime(vol, n + len - .05); g.gain.exponentialRampToValueAtTime(.0001, n + len);
+    for (const fr of [370, 466]) {
+      const o = a.createOscillator(), vib = a.createOscillator(), vd = a.createGain();
+      o.type = 'sawtooth'; o.frequency.value = fr; vib.frequency.value = 7; vd.gain.value = 3; vib.connect(vd).connect(o.frequency);
+      o.connect(f); o.start(n); vib.start(n); o.stop(n + len + .05); vib.stop(n + len + .05);
+    }
+    f.connect(g); route(g, .2);
+  }
   const SFX = {
     appear() { tone({ f0: 150, f1: 210, dur: .06, vol: .07 }); },            // soft low "puff" as the next piece pops in
     lift() { hiss({ dur: .13, vol: .07, type: 'bandpass', f0: 500, f1: 1100, q: .8 }); },   // airy swish
@@ -311,10 +339,23 @@
     start() { hiss({ dur: .25, vol: .08, type: 'bandpass', f0: 400, f1: 1800, q: .8 }); tone({ f0: 180, f1: 360, dur: .18, vol: .12, delay: .05 }); },
     hurt() { tone({ f0: 160, f1: 70, dur: .3, vol: .45 }); tone({ f0: 330, f1: 220, dur: .25, type: 'triangle', vol: .1, delay: .05 }); hiss({ dur: .15, vol: .12, type: 'lowpass', f0: 900 }); },
     life() { [2, 4, 7].forEach((n, i) => bell(PENTA[n], .08, i * .07)); hiss({ dur: .3, vol: .05, type: 'highpass', f0: 6000, delay: .1, wet: .5 }); },
-    rev() { tone({ f0: 55, f1: 120, dur: .75, type: 'sawtooth', vol: .035 }); tone({ f0: 82, f1: 170, dur: .7, type: 'triangle', vol: .06 }); hiss({ dur: .6, vol: .05, type: 'lowpass', f0: 500 }); },
-    horn() { [0, .17].forEach(d => { tone({ f0: 415, dur: d ? .17 : .11, type: 'square', vol: .028, delay: d }); tone({ f0: 523, dur: d ? .17 : .11, type: 'square', vol: .022, delay: d }); }); },
+    // bus leaving: engine revs up and drives off, a soft "pff" as the exhaust cloud billows
+    busGo() { rumble({ dur: 1.5, vol: .16, f0: 220, f1: 620, rate0: 14, rate1: 32, attack: .12, release: .55 });
+      hiss({ dur: .7, vol: .07, type: 'lowpass', f0: 1200, f1: 260, delay: .78, wet: .3 }); hiss({ dur: .35, vol: .05, type: 'bandpass', f0: 700, f1: 300, q: .7, delay: .82 }); },
+    // next bus: engine coming closer and slowing, air-brake hiss, a friendly double honk
+    busArrive() { rumble({ dur: 1.05, vol: .14, f0: 520, f1: 210, rate0: 30, rate1: 13, attack: .5, release: .3, swell: .2 });
+      hiss({ dur: .28, vol: .035, type: 'highpass', f0: 3200, delay: .95 }); },
+    horn() { honk(0, .13); honk(.19, .22); },
     whoosh(up) { hiss({ dur: .35, vol: .1, type: 'bandpass', f0: up ? 350 : 1600, f1: up ? 1600 : 350, q: .9 }); },
     banner() { bell(PENTA[4], .07); bell(PENTA[7], .06, .08); },
+    // obstacle reveal: soft low boom, rising airy shimmer, a chime for each line as it drops in, icy tinkles for the plate
+    obstacle() {
+      tone({ f0: 130, f1: 55, dur: .7, vol: .22 }); hiss({ dur: .5, vol: .05, type: 'lowpass', f0: 380 });
+      hiss({ dur: 1.1, vol: .045, type: 'bandpass', f0: 500, f1: 4200, q: 1.6, wet: .5 });
+      [[.08, 4], [.3, 6], [.75, 8]].forEach(([d, n]) => { bell(PENTA[n], .065, d); bell(PENTA[n] * 1.5, .025, d + .02); });
+      for (let i = 0; i < 6; i++) tone({ f0: 2200 + Math.random() * 1600, dur: .14, vol: .025, delay: .5 + i * .06, wet: .6 });
+      [523.25, 659.25, 783.99].forEach(f => tone({ f0: f, dur: 1.4, vol: .018, delay: .15, attack: .5, wet: .7 }));
+    },
     ice(v = 1) {                                        // glassy crack + tinkling shards
       for (let i = 0; i < 6; i++) hiss({ dur: .03 + Math.random() * .04, vol: .35 * v, delay: i * .018, type: 'bandpass', f0: 3500 + Math.random() * 3500, q: 3 });
       hiss({ dur: .25, vol: .15 * v, type: 'highpass', f0: 5000, delay: .03, wet: .4 });
@@ -464,11 +505,13 @@
     line('Break the ICE by serving a', 609); line('plate next to it!', 628);
     ctx.restore();
   }
+  // drop-in: falls from above with a little bounce and fades in
+  const dropIn = (k, start) => { const u = clamp01((k - start) / .45); return { u, dy: -(1 - back(u)) * 70, a: clamp01(u * 2.5) }; };
   function drawObstacleIntro(k) {
     // Figma 'Obstacle Intro': 90% black, the glow (screen blend) behind the frozen plate, title, subtitle, bubble, tap hint
     ctx.fillStyle = 'rgba(0,0,0,.9)'; ctx.fillRect(0, 0, W, H);
-    const bk = clamp01((k - .55) * 3);
-    if (bk > 0) { ctx.save(); const s = back(bk); ctx.translate(201, 618); ctx.scale(s, s); ctx.translate(-201, -618); obstacleBubble(bk); ctx.restore(); }
+    const bd = dropIn(k, .7);
+    if (bd.u > 0) { ctx.save(); ctx.translate(0, bd.dy); obstacleBubble(bd.a); ctx.restore(); }
     const gk = clamp01((k - .2) * 2.5);
     if (gk > 0) {
       ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = gk * (.9 + Math.sin(t * 2.2) * .1);
@@ -487,9 +530,9 @@
         if (tw > .1) star(201 + Math.cos(a) * rad, 424 + Math.sin(a) * rad, (2.5 + (tw - .1) * 6) * pk, t * 1.5 + i, i % 3 ? '#FFFFFF' : '#CFEAFF');
       }
     }
-    const tk = back(clamp01((k - .1) * 3));
-    if (tk > 0) {                                           // "Ice": light outer outline, blue outline, cream gradient
-      ctx.save(); ctx.translate(201, 172); ctx.scale(tk, tk);
+    const td = dropIn(k, .05);
+    if (td.u > 0) {                                         // "Ice": light outer outline, blue outline, cream gradient
+      ctx.save(); ctx.globalAlpha = td.a; ctx.translate(201, 172 + td.dy);
       ctx.font = '900 46.67px "Goldplay", system-ui, sans-serif'; ctx.lineJoin = 'round';
       const og = ctx.createLinearGradient(0, -24, 0, 24); og.addColorStop(0, 'rgba(165,193,252,.2)'); og.addColorStop(1, '#EBF0FF');
       const fg = ctx.createLinearGradient(0, -21, 0, 21); fg.addColorStop(0, '#F7F2ED'); fg.addColorStop(1, '#EED2B8');
@@ -498,18 +541,18 @@
       ctx.fillStyle = fg; tracked('Ice', 0, 0, -2.33, (c, x, y) => ctx.fillText(c, x, y));
       ctx.restore();
     }
-    const sk = back(clamp01((k - .25) * 3));
-    if (sk > 0) {                                           // "New Obstacle Unlocked!": orange, cream outline, soft brown shadow
-      ctx.save(); ctx.translate(201, 234); ctx.scale(sk, sk);
+    const sd = dropIn(k, .28);
+    if (sd.u > 0) {                                         // "New Obstacle Unlocked!": orange, cream outline, soft brown shadow
+      ctx.save(); ctx.globalAlpha = sd.a; ctx.translate(201, 234 + sd.dy);
       ctx.font = '900 29.37px "Goldplay", system-ui, sans-serif'; ctx.lineJoin = 'round';
       ctx.save(); ctx.shadowColor = 'rgba(182,145,111,.5)'; ctx.shadowOffsetY = 3.18; ctx.shadowBlur = 4.24;
       ctx.lineWidth = 4.24; ctx.strokeStyle = '#F7EFE9'; tracked('New Obstacle Unlocked!', 0, 0, -1.47, (c, x, y) => ctx.strokeText(c, x, y)); ctx.restore();
       ctx.fillStyle = '#F97042'; tracked('New Obstacle Unlocked!', 0, 0, -1.47, (c, x, y) => ctx.fillText(c, x, y));
       ctx.restore();
     }
-    const hk = clamp01((k - 1.1) * 3);
-    if (hk > 0) {                                           // "Tap to Continue"
-      ctx.save(); ctx.globalAlpha = hk * (.75 + Math.sin(t * 4) * .25);
+    const hd = dropIn(k, 1.05);
+    if (hd.u > 0) {                                         // "Tap to Continue"
+      ctx.save(); ctx.globalAlpha = hd.a * (hd.u < 1 ? 1 : .75 + Math.sin(t * 4) * .25); ctx.translate(0, hd.dy);
       ctx.font = '900 17.67px "Goldplay", system-ui, sans-serif'; ctx.lineJoin = 'round';
       const g = ctx.createLinearGradient(0, 732, 0, 751.5); g.addColorStop(0, '#F9F5F0'); g.addColorStop(1, '#F5E4D0');
       ctx.lineWidth = 4.9; ctx.strokeStyle = '#3647DE'; tracked('Tap to Continue', 201.5, 741.8, -.71, (c, x, y) => ctx.strokeText(c, x, y));
@@ -777,7 +820,7 @@
     if (kind === 'win') { progress = S.level + 1; saveProgress(); pendingDrive = true; }
     if (kind !== 'win') { S.plates.forEach(q => q.shake = .8); }
   }
-  function goMenu() { endEl.hidden = true; scene = 'menu'; fade = 1; if (pendingDrive) { pendingDrive = false; menuDrive(); SFX.rev(); } }
+  function goMenu() { endEl.hidden = true; scene = 'menu'; fade = 1; if (pendingDrive) { pendingDrive = false; menuDrive(); SFX.busGo(); } }
   function startRun() {
     S = newRun(); S.level = progress; S.obstacleTest = true; setupStage(Math.min(progress, STAGES.length) - 1); note = null;   // testing: obstacle intro on Play badgeNum = 0; badgeSlide = null; badgeKey = '';
     particles = []; sparks = []; heartBreak.fill(0); heartFx.fill(0);
@@ -928,7 +971,7 @@
       S.plates.forEach(p => p.enter = clamp01((S.phaseT - .15 - p.delay) / .55));
       if (S.phaseT > 1.25) {
         if (st.livesIntro && !S.livesShown) { S.livesShown = true; S.phase = 'lives'; S.phaseT = 0; SFX.life(); }
-        else if ((st.iceIntro || S.obstacleTest) && !S.iceShown) { S.phase = 'obstacle'; S.phaseT = 0; SFX.banner(); }
+        else if ((st.iceIntro || S.obstacleTest) && !S.iceShown) { S.phase = 'obstacle'; S.phaseT = 0; SFX.obstacle(); }
         else { S.phase = 'play'; S.phaseT = 0; spawnPiece(); }
       }
     } else if (S.phase === 'lives') {
@@ -1026,7 +1069,6 @@
     if (MB.phase === 'idle') { if ((MB.idleT = (MB.idleT || 0) + dt) > 4.5) { MB.idleT = 0; openDrive(); } } else MB.idleT = 0;
     if (MB.phase === 'drive') {
       MB.mix = Math.min(1, MB.t / (DRIVE.inStart + DRIVE.inDur));
-      if (MB.t > .02 && MB.t - dt <= .02) SFX.whoosh(false);
       // near the end of the road the exhaust thickens and billows up over the bus, which shrinks away inside it
       const lp0 = leavingPose(); if (lp0) MB.pipe = { x: busX(lp0) + BUS_SPRITE.pipe[0] * lp0.k, y: lp0.y + BUS_SPRITE.pipe[1] * lp0.k, k: roadW(OUT_END) / PARK_W };
       if (MB.pipe && MB.t > DRIVE.out - .32 && MB.t < DRIVE.out + DRIVE.hold + .1 && (MB.gasT -= dt) <= 0) {
@@ -1035,7 +1077,7 @@
         gas.push({ x: MB.pipe.x - BUS_SPRITE.pipe[0] * k * u + (Math.random() - .5) * bw * (.25 + .8 * u), y: MB.pipe.y - Math.random() * bh * (.15 + .95 * u),
           vx: (Math.random() - .5) * 70 * k, vy: -(40 + Math.random() * 90) * k, r: 4 * k, grow: (24 + Math.random() * 16) * k * (.75 + u * .6), age: 0, life: 1.3 + Math.random() * .45 });
       }
-      if (MB.t > DRIVE.inStart && MB.t - dt <= DRIVE.inStart) SFX.whoosh(true);
+      if (MB.t > DRIVE.inStart && MB.t - dt <= DRIVE.inStart) SFX.busArrive();
       if (MB.t > DRIVE.inStart + DRIVE.inDur) { MB.scene = MB.nextScene; MB.phase = 'idle'; MB.shown = progress; MB.btnPop = 1; MB.mix = 1; SFX.horn(); for (let i = 0; i < 4; i++) addPuff(parkedPose(), 1.3);
         if (MB.then) { const go = MB.then; MB.then = null; setTimeout(go, 450); } }
     }
@@ -1063,15 +1105,27 @@
     if (MB.phase !== 'drive' || !MB.mass) return;
     const T = MB.t, k = roadW(OUT_END) / PARK_W, lp = leavingPose(), by = lp && !lp.vanish ? lp.y : OUT_END, bx = ROAD_CX + 2;
     const t0 = DRIVE.out - .3, t1 = DRIVE.out + DRIVE.hold - .02, gone = DRIVE.out + DRIVE.hold + DRIVE.vanish + .05;
-    const blobs = [];
+    const blobs = [], wisps = [];
     for (const q of MB.mass) {
       const born = t0 + q.row * (t1 - t0), g = clamp01((T - born) / .2); if (g <= 0) continue;
-      const e = 1 + 2.2 * Math.pow(g - 1, 3) + 1.2 * Math.pow(g - 1, 2), d = Math.max(0, T - gone), fade = clamp01(1 - d / .75);
-      if (fade <= 0) continue;
-      blobs.push({ r: q.r * k * e * (1 + d * .5), x: bx + (q.x + q.drift * d * 1.6) * k, y: by + (q.y - 8) * k * 1.12 - q.rise * d * 1.4, a: fade * .97, spin: q.spin });
+      const e = 1 + 2.2 * Math.pow(g - 1, 3) + 1.2 * Math.pow(g - 1, 2);
+      const u = clamp01((T - gone - (1 - q.row) * .28) / .9), r = q.r * k * e, x = bx + q.x * k, y = by + (q.y - 8) * k * 1.12;
+      if (u <= 0) { blobs.push({ r, x, y, spin: q.spin }); continue; }
+      if (u >= 1) continue;
+      // three wisps pull apart from the puff, carried right and up by the wind, softening as they go
+      const w = u * (2 - u), a = Math.pow(1 - u, 1.6);
+      for (let j = 0; j < 3; j++) {
+        const ang = q.spin + j * 2.1, spread = r * .9 * w;
+        wisps.push({ x: x + Math.cos(ang) * spread + (26 + q.drift * .4) * k * w * 1.6, y: y + Math.sin(ang) * spread * .7 - (q.rise + 14) * k * w * 1.3, r: r * (.62 + .3 * w), a });
+      }
     }
-    for (const q of blobs) { ctx.globalAlpha = q.a; ctx.fillStyle = 'rgb(216,208,198)'; ctx.beginPath(); ctx.arc(q.x + q.r * .12, q.y + q.r * .2, q.r * .96, 0, TAU); ctx.fill(); }
-    for (const q of blobs) { ctx.globalAlpha = q.a; ctx.fillStyle = '#F8F4EE'; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, TAU); ctx.arc(q.x + Math.cos(q.spin) * q.r * .7, q.y + Math.sin(q.spin) * q.r * .35, q.r * .7, 0, TAU); ctx.fill(); }
+    for (const q of blobs) { ctx.globalAlpha = .97; ctx.fillStyle = 'rgb(216,208,198)'; ctx.beginPath(); ctx.arc(q.x + q.r * .12, q.y + q.r * .2, q.r * .96, 0, TAU); ctx.fill(); }
+    for (const q of blobs) { ctx.globalAlpha = .97; ctx.fillStyle = '#F8F4EE'; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, TAU); ctx.arc(q.x + Math.cos(q.spin) * q.r * .7, q.y + Math.sin(q.spin) * q.r * .35, q.r * .7, 0, TAU); ctx.fill(); }
+    for (const q of wisps) {
+      const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, q.r);
+      g.addColorStop(0, `rgba(248,244,238,${.95 * q.a})`); g.addColorStop(.55, `rgba(248,244,238,${.8 * q.a})`); g.addColorStop(1, 'rgba(248,244,238,0)');
+      ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, TAU); ctx.fill();
+    }
     ctx.globalAlpha = 1;
   }
   function drawGas() {                                       // thick exhaust: puffy blobs that swell fast, hold, then thin out
@@ -1344,7 +1398,7 @@
     setTimeout(openDrive, 900);
   }
   // testing: the bus change plays every time the game is opened or brought back to the screen
-  function openDrive() { if (scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.rev(); } }
+  function openDrive() { if (scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.busGo(); } }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(openDrive, 600); });
   addEventListener('pageshow', e => { if (e.persisted) setTimeout(openDrive, 600); });
   function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
