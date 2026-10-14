@@ -1125,6 +1125,61 @@
   const sAt = y => { const f = Math.max(0, Math.min(DASH_S.length - 1.001, y - CREST)), i = Math.floor(f); return DASH_S[i] + (DASH_S[i + 1] - DASH_S[i]) * (f - i); };
   const yAt = s => { let lo = CREST, hi = 1000; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (sAt(m) < s) lo = m; else hi = m; } return (lo + hi) / 2; };
   const DASH_PHASE = sAt(684) % 1;                         // a dash starts at y 684 in the painting
+  // 2.5D drive: the camera rides along the bridge. Depth u is measured in curb blocks (joints found in the painting;
+  // block length on screen = 0.0583 * roadWidth^1.448). Everything below the crest is treated as ground and re-drawn
+  // row by row from farther rows of the painting, so the road, houses and trees all stream toward the camera.
+  // The painting repeats every 10 blocks (railing brackets every 5), so the trip is one 10-block tile, seam feathered.
+  const blockLen = y => .0583 * Math.pow(roadW(y), 1.448);
+  const U_TAB = (() => { const a = [], J = [393, 415, 440, 473, 508, 551, 600, 646, 701, 752, 816]; let u = 0;
+    for (let y = 340; y <= 920; y += .25) { a.push(u); u += .25 / blockLen(y + .125); }
+    const at = y => a[Math.round((y - 340) * 4)], off = J.reduce((m, y, k) => m + at(y) - k, 0) / J.length;
+    return a.map(v => v - off); })();
+  const uAt = y => { const f = Math.max(0, Math.min(U_TAB.length - 1.001, (y - 340) * 4)), i = Math.floor(f); return U_TAB[i] + (U_TAB[i + 1] - U_TAB[i]) * (f - i); };
+  const yAtU = u => { let lo = 340, hi = 920; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (uAt(m) < u) lo = m; else hi = m; } return (lo + hi) / 2; };
+  const TILE = 10, TILE0 = .85, FEATHER = .65, GROUND_TOP = 372, PADX = 280, DASH_U = 2;
+  const ROAD_C = y => (roadL(y) + roadR(y)) / 2;
+  let groundTex = null;                                     // the painting with mirrored sides, so far rows have scenery out wide
+  function makeGround() {
+    const im = A.menuBg, sc = im.width / W, c = document.createElement('canvas');
+    c.width = Math.round((W + 2 * PADX) * sc); c.height = Math.round((H - 340) * sc);
+    const x = c.getContext('2d'), sy = 340 * sc, h = c.height, pw = PADX * sc;
+    x.drawImage(im, 0, sy, im.width, h, pw, 0, im.width, h);
+    // out past the edges: the outermost 60px of scenery (clear of the railings), mirrored back and forth
+    const sw = 60 * sc;
+    for (let i = 0; i * sw < pw; i++) {
+      const flip = i % 2 === 0, lx = pw - (i + 1) * sw, rx = pw + im.width + i * sw;
+      x.save(); if (flip) { x.translate(lx + sw, 0); x.scale(-1, 1); } else x.translate(lx, 0); x.drawImage(im, 0, sy, sw, h, 0, 0, sw, h); x.restore();
+      x.save(); if (flip) { x.translate(rx + sw, 0); x.scale(-1, 1); } else x.translate(rx, 0); x.drawImage(im, im.width - sw, sy, sw, h, 0, 0, sw, h); x.restore();
+    }
+    // the still painting just above the moving part, fading out downward, to soften where the two meet
+    const e = document.createElement('canvas'); e.width = im.width; e.height = Math.round(24 * sc);
+    const ex = e.getContext('2d'); ex.drawImage(im, 0, 366 * sc, im.width, e.height, 0, 0, im.width, e.height);
+    ex.globalCompositeOperation = 'destination-in'; const g = ex.createLinearGradient(0, 0, 0, e.height); g.addColorStop(.25, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ex.fillStyle = g; ex.fillRect(0, 0, e.width, e.height);
+    groundTex = { c, sc, edge: e };
+  }
+  // the ground row-by-row for travel `s` (blocks); alpha fades the moving copy over the still painting
+  function drawGround(s, alpha) {
+    if (!groundTex) makeGround();
+    const { c, sc } = groundTex, BH = 2;
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.beginPath(); ctx.moveTo(0, 375); ctx.lineTo(125, 375); ctx.lineTo(125, 398); ctx.lineTo(285, 398); ctx.lineTo(285, GROUND_TOP); ctx.lineTo(W, GROUND_TOP); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.clip();
+    const row = (y, su, a) => {
+      const ys = yAtU(su), k = roadW(y) / roadW(ys), sh = BH * blockLen(ys) / blockLen(y);
+      ctx.globalAlpha = alpha * a;
+      ctx.drawImage(c, 0, (ys - 340) * sc, c.width, sh * sc, ROAD_C(y) - (ROAD_C(ys) + PADX) * k, y, (W + 2 * PADX) * k, BH + .6);
+    };
+    for (let y = GROUND_TOP; y < H; y += BH) {
+      const wu = uAt(y) - s, pu = ((wu - TILE0) % TILE + TILE) % TILE + TILE0;
+      row(y, pu, 1);
+      if (pu > TILE0 + TILE - FEATHER) { const f = (pu - (TILE0 + TILE - FEATHER)) / FEATHER; row(y, pu - TILE, f * f * (3 - 2 * f)); }
+    }
+    ctx.globalAlpha = alpha; ctx.drawImage(groundTex.edge, 0, 366, W, 24);
+    ctx.restore();
+  }
+  const DRIVE3D = { dur: 2.6, dist: TILE };
+  const travelAt = T => { const p = clamp01(T / DRIVE3D.dur); return DRIVE3D.dist * (p - Math.sin(TAU * p) / TAU); };
+  const travelSpeed = T => { const p = clamp01(T / DRIVE3D.dur); return DRIVE3D.dist / DRIVE3D.dur * (1 - Math.cos(TAU * p)); };
   function makeBusSkins() {}                                // the bus keeps its painted colours
   // scenery that changes a little each level: light of the day, clouds, a balloon now and then
   const SKY_TINTS = [null, ['255,190,150', .16], ['255,240,170', .1], ['200,180,255', .14], ['255,210,120', .18], ['170,220,255', .12]];
@@ -1156,11 +1211,11 @@
   const puffs = [];
   const DRIVE = { out: 1.05, hold: .18, vanish: .3, inStart: .97, inDur: 1 };   // hold: the bus waits inside the gas before it shrinks   // seconds
   MB.scene = sceneFor(progress);
-  function menuDrive() { Object.assign(MB, { phase: 'drive', t: 0, nextScene: sceneFor(progress), mix: 0, gasT: 0, pipe: null, mass: makeMass() }); }
+  function menuDrive() { Object.assign(MB, { phase: 'drive', t: 0, nextScene: sceneFor(progress), mix: 0, gasT: 0, pipe: null, mass: null }); }
   function skipDrive() { if (MB.nextScene) MB.scene = MB.nextScene; Object.assign(MB, { phase: 'idle', shown: progress, mix: 1, btnPop: 1 }); if (MB.then) { const go = MB.then; MB.then = null; go(); } }
   const OUT_END = 418;                                       // where the leaving bus shrinks away, near the end of the road
-  function leavingPose() {                                   // the bus that drives away
-    if (MB.phase !== 'drive') return null;
+  function leavingPose() {                                   // (bus swap version, unused while the camera rides along)
+    if (MB.phase !== 'drive' || !MB.mass) return null;
     const T = MB.t;
     if (T <= DRIVE.out) { const u = T / DRIVE.out, e = u * u * (1.6 - .6 * u), y = PARK_Y + (OUT_END - PARK_Y) * e, k = roadW(y) / PARK_W;
       return { y, k, ky: k * (.8 + .2 * k), a: 1 }; }
@@ -1172,6 +1227,10 @@
   }
   function parkedPose() {                                    // the bus at the stop: idle, or the next one rolling in
     if (MB.phase !== 'drive') return { y: PARK_Y, k: 1, ky: 1 + Math.sin(t * 4) * .002, a: 1 };
+    if (!MB.mass) {                                         // riding along: the bus pulls a little ahead as it speeds up, then the camera catches up
+      const p = clamp01(MB.t / DRIVE3D.dur), y = PARK_Y - 26 * Math.pow(Math.sin(Math.PI * p), 2), k = roadW(y) / PARK_W;
+      return { y, k, ky: k * (1 + Math.sin(t * 31) * .004), a: 1 };
+    }
     const T = MB.t - DRIVE.inStart; if (T < 0) return null;
     const u = Math.min(1, T / DRIVE.inDur), e = 1 - Math.pow(1 - u, 3), y = PARK_Y + 300 * (1 - e);
     const dip = u > .85 ? Math.sin((u - .85) / .15 * Math.PI) * .02 : 0;
@@ -1181,7 +1240,14 @@
     MB.t += dt; MB.btnPop = Math.max(0, MB.btnPop - dt * 2.5);
     // testing: the preview window can stay loaded when it is closed and reopened, so the bus change also repeats on the menu
     if (MB.phase === 'idle') { if ((MB.idleT = (MB.idleT || 0) + dt) > 4.5) { MB.idleT = 0; openDrive(); } } else MB.idleT = 0;
-    if (MB.phase === 'drive') {
+    if (MB.phase === 'drive' && !MB.mass) {
+      MB.mix = clamp01(MB.t / DRIVE3D.dur);
+      const v = travelSpeed(MB.t);                           // exhaust left on the road streams back with it
+      for (const q of puffs) q.y += blockLen(Math.max(GROUND_TOP, q.y)) * v * dt;
+      if (MB.t > DRIVE3D.dur - 1.1 && MB.t - dt <= DRIVE3D.dur - 1.1) SFX.busArrive();
+      if (MB.t > DRIVE3D.dur) { MB.scene = MB.nextScene; MB.phase = 'idle'; MB.shown = progress; MB.btnPop = 1; MB.mix = 1; SFX.horn(); for (let i = 0; i < 3; i++) addPuff(parkedPose(), 1.3);
+        if (MB.then) { const go = MB.then; MB.then = null; setTimeout(go, 450); } }
+    } else if (MB.phase === 'drive') {
       MB.mix = Math.min(1, MB.t / (DRIVE.inStart + DRIVE.inDur));
       // near the end of the road the exhaust thickens and billows up over the bus, which shrinks away inside it
       const lp0 = leavingPose(); if (lp0) MB.pipe = { x: busX(lp0) + BUS_SPRITE.pipe[0] * lp0.k, y: lp0.y + BUS_SPRITE.pipe[1] * lp0.k, k: roadW(OUT_END) / PARK_W };
@@ -1286,9 +1352,10 @@
     if (sc.balloon) drawBalloon(sc.balloon, a);
     for (const c of sc.clouds) drawCloud(c, a);
   }
-  function drawDashes(offset) {
+  const DASH_U0 = uAt(684);                                 // a dash starts at y 684 in the painting
+  function drawDashes(s) {
     for (let y = CREST + 1; y < H; y++) {
-      if (((sAt(y) - DASH_PHASE - offset) % 1 + 1) % 1 > .406) continue;
+      if ((((uAt(y) - s - DASH_U0) % DASH_U) + DASH_U) % DASH_U > .406 * DASH_U) continue;
       const w = roadW(y) * .063, k = (y - CREST) / (H - CREST);
       ctx.fillStyle = `rgb(254,${Math.round(244 - 18 * k)},${Math.round(207 - 25 * k)})`;
       ctx.fillRect(ROAD_CX - w / 2, y, w, 1.02);
@@ -1308,7 +1375,9 @@
   }
   function renderMenu() {
     ctx.drawImage(A.menuBg, 0, 0, W, W * A.menuBg.height / A.menuBg.width);
-    drawDashes(0);
+    const riding = MB.phase === 'drive' && !MB.mass, travel = riding ? travelAt(MB.t) : 0;
+    if (riding) drawGround(travel, clamp01(Math.min(MB.t / .3, (DRIVE3D.dur - MB.t) / .35)));
+    drawDashes(travel);
     drawSceneExtras(MB.scene, MB.phase === 'drive' ? 1 - MB.mix : 1);
     if (MB.phase === 'drive') drawSceneExtras(MB.nextScene, MB.mix);
     if (MB.birds) drawBirds(MB.birds);
