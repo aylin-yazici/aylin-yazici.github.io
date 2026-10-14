@@ -348,14 +348,8 @@
     horn() { honk(0, .13); honk(.19, .22); },
     whoosh(up) { hiss({ dur: .35, vol: .1, type: 'bandpass', f0: up ? 350 : 1600, f1: up ? 1600 : 350, q: .9 }); },
     banner() { bell(PENTA[4], .07); bell(PENTA[7], .06, .08); },
-    // obstacle reveal: soft low boom, rising airy shimmer, a chime for each line as it drops in, icy tinkles for the plate
-    obstacle() {
-      tone({ f0: 130, f1: 55, dur: .7, vol: .22 }); hiss({ dur: .5, vol: .05, type: 'lowpass', f0: 380 });
-      hiss({ dur: 1.1, vol: .045, type: 'bandpass', f0: 500, f1: 4200, q: 1.6, wet: .5 });
-      [[.08, 4], [.3, 6], [.75, 8]].forEach(([d, n]) => { bell(PENTA[n], .065, d); bell(PENTA[n] * 1.5, .025, d + .02); });
-      for (let i = 0; i < 6; i++) tone({ f0: 2200 + Math.random() * 1600, dur: .14, vol: .025, delay: .5 + i * .06, wet: .6 });
-      [523.25, 659.25, 783.99].forEach(f => tone({ f0: f, dur: 1.4, vol: .018, delay: .15, attack: .5, wet: .7 }));
-    },
+    // obstacle reveal: one short airy swish and a single soft chime
+    obstacle() { hiss({ dur: .28, vol: .045, type: 'bandpass', f0: 900, f1: 2600, q: 1.2 }); bell(PENTA[7], .06, .12); },
     ice(v = 1) {                                        // glassy crack + tinkling shards
       for (let i = 0; i < 6; i++) hiss({ dur: .03 + Math.random() * .04, vol: .35 * v, delay: i * .018, type: 'bandpass', f0: 3500 + Math.random() * 3500, q: 3 });
       hiss({ dur: .25, vol: .15 * v, type: 'highpass', f0: 5000, delay: .03, wet: .4 });
