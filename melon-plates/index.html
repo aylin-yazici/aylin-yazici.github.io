@@ -1322,13 +1322,9 @@
     const dt = Math.min(.05, (now - last) / 1000); last = now;
     update(dt); render(); requestAnimationFrame(frame);
   }
-  function boot(data) {
-    // resume only a game that was mid-play in this same version; anything else starts at the menu
-    if (data && data.S && data.S.v === VERSION && data.scene === 'game' && data.S.phase === 'play' && !data.S.piece?.hint) {
-      S = data.S; scene = 'game'; S.piece = null; [GEN.x, GEN.y] = STAGES[S.stage].board ? STAGES[S.stage].board.gen : LEVEL_GEN; setTimeout(spawnPiece, 50);
-    } else {
-      S = newRun(); setupStageSilent(0); scene = 'menu';
-    }
+  function boot() {
+    // always open on the main menu (also when the preview reloads mid-game)
+    S = newRun(); setupStageSilent(0); scene = 'menu';
     endEl.hidden = true; note = null;
   }
   function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
