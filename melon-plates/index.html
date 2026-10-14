@@ -184,6 +184,7 @@
     if (!st.hideLives && !st.livesIntro) S.livesShown = true;
     Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0,
                        piece: null, pieceIn: 0, phase: 'in', phaseT: 0 });
+    if ((st.iceIntro || S.obstacleTest) && !S.iceShown) { S.phase = 'obstacle'; SFX.banner(); }   // the obstacle intro comes before the board
     fly = null; flyers = []; idle = 0;
     SFX.whoosh(true);
   }
@@ -465,14 +466,26 @@
   }
   function drawObstacleIntro(k) {
     // Figma 'Obstacle Intro': 90% black, the glow (screen blend) behind the frozen plate, title, subtitle, bubble, tap hint
-    ctx.fillStyle = `rgba(0,0,0,${.9 * clamp01(k * 3)})`; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(0,0,0,.9)'; ctx.fillRect(0, 0, W, H);
     const bk = clamp01((k - .55) * 3);
     if (bk > 0) { ctx.save(); const s = back(bk); ctx.translate(201, 618); ctx.scale(s, s); ctx.translate(-201, -618); obstacleBubble(bk); ctx.restore(); }
     const gk = clamp01((k - .2) * 2.5);
     if (gk > 0) {
       ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = gk * (.9 + Math.sin(t * 2.2) * .1);
-      const s = .92 + gk * .08 + Math.sin(t * 1.6) * .015; ctx.translate(201, 424); ctx.scale(s, s);
+      const s = .92 + gk * .08 + Math.sin(t * 1.6) * .015; ctx.translate(201, 424); ctx.rotate(t * .55); ctx.scale(s, s);   // the light spins
       ctx.drawImage(A.obstGlow, 13 - 201, 211 - 424, 376.1, 426.5); ctx.restore();
+      // slow rays turning the other way
+      ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = gk * .55; ctx.translate(201, 424); ctx.rotate(-t * .25);
+      const rg = ctx.createRadialGradient(0, 0, 50, 0, 0, 190); rg.addColorStop(0, 'rgba(170,215,255,.28)'); rg.addColorStop(1, 'rgba(170,215,255,0)'); ctx.fillStyle = rg;
+      for (let i = 0; i < 12; i++) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 190, i * TAU / 12, i * TAU / 12 + TAU / 34); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+      // ice shards floating around the plate
+      for (let i = 0; i < 7; i++) {
+        const a = i * TAU / 7 + t * .22, rad = 118 + Math.sin(t * 1.3 + i) * 8, im = A['ice' + (i * 5 % ICE_SHARDS)];
+        if (!im) continue;
+        ctx.save(); ctx.globalAlpha = gk * .95; ctx.translate(201 + Math.cos(a) * rad, 424 + Math.sin(a) * rad * .92 + Math.sin(t * 2 + i) * 4);
+        ctx.rotate(Math.sin(t * .9 + i) * .6 + i); const sc = .42 + (i % 3) * .1; ctx.scale(sc, sc); ctx.drawImage(im, -im.width / 2, -im.height / 2); ctx.restore();
+      }
     }
     const pk = back(clamp01((k - .35) * 2.6));
     if (pk > 0) {
@@ -480,6 +493,11 @@
       const demo = [1, 1, 1, 0, 1, 1].map(Boolean);
       ctx.drawImage(A.plate, -MC[0], -MC[1]); demo.forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawIce(demo);
       ctx.restore();
+      // twinkling sparkles around it
+      for (let i = 0; i < 8; i++) {
+        const a = i * TAU / 8 + .4 - t * .12, tw = Math.sin(t * 3.2 + i * 1.7), rad = 92 + (i % 2) * 34;
+        if (tw > .1) star(201 + Math.cos(a) * rad, 424 + Math.sin(a) * rad, (2.5 + (tw - .1) * 6) * pk, t * 1.5 + i, i % 3 ? '#FFFFFF' : '#CFEAFF');
+      }
     }
     const tk = back(clamp01((k - .1) * 3));
     if (tk > 0) {                                           // "Ice": light outer outline, blue outline, cream gradient
@@ -813,7 +831,7 @@
     if (S.phase === 'lives') { if (S.phaseT > 1.1) { S.phase = 'play'; S.phaseT = 0; SFX.appear(); spawnPiece(); } return; }
     if (S.phase === 'obstacle') {
       if (S.phaseT > 1.1) {
-        S.iceShown = true; S.phase = 'play'; S.phaseT = 0; SFX.place(); spawnPiece();
+        S.iceShown = true; S.phase = 'in'; S.phaseT = 0; SFX.place(); SFX.whoosh(true);      // now the board comes in
       }
       return;
     }
@@ -979,11 +997,12 @@
   // MB: menu bus state. phase idle | drive
   // On a level win the parked bus drives up the bridge, shrinks away near the end with a puff, and at the same time
   // the next bus rolls in from the bottom and parks. Same bus art; the camera never moves.
-  const MB = { phase: 'idle', t: 0, shown: progress, scene: null, nextScene: null, mix: 1, puffT: 0, puffT2: 0, btnPop: 0, birds: null, birdT: 0, cover: null };
+  const MB = { phase: 'idle', t: 0, shown: progress, scene: null, nextScene: null, mix: 1, puffT: 0, puffT2: 0, btnPop: 0, birds: null, birdT: 0, gasT: 0, pipe: null };
+  const gas = [];                                           // the exhaust cloud that swallows the leaving bus
   const puffs = [];
-  const DRIVE = { out: 1.05, vanish: .3, inStart: .97, inDur: 1 };   // seconds
+  const DRIVE = { out: 1.05, hold: .18, vanish: .3, inStart: .97, inDur: 1 };   // hold: the bus waits inside the gas before it shrinks   // seconds
   MB.scene = sceneFor(progress);
-  function menuDrive() { Object.assign(MB, { phase: 'drive', t: 0, nextScene: sceneFor(progress), mix: 0, cover: null }); }
+  function menuDrive() { Object.assign(MB, { phase: 'drive', t: 0, nextScene: sceneFor(progress), mix: 0, gasT: 0, pipe: null }); }
   function skipDrive() { if (MB.nextScene) MB.scene = MB.nextScene; Object.assign(MB, { phase: 'idle', shown: progress, mix: 1, btnPop: 1 }); }
   const OUT_END = 418;                                       // where the leaving bus shrinks away, near the end of the road
   function leavingPose() {                                   // the bus that drives away
@@ -992,7 +1011,8 @@
     if (T <= DRIVE.out) { const u = T / DRIVE.out, e = u * u * (1.6 - .6 * u), y = PARK_Y + (OUT_END - PARK_Y) * e, k = roadW(y) / PARK_W;
       return { y, k, ky: k * (.8 + .2 * k), a: 1 }; }
     // shrink to nothing around the bus's middle, fading as it goes
-    const v = Math.min(1, (T - DRIVE.out) / DRIVE.vanish), k0 = roadW(OUT_END) / PARK_W, ky0 = k0 * (.8 + .2 * k0), mid = OUT_END + BUS_SPRITE.dy * ky0 / 2;
+    if (T <= DRIVE.out + DRIVE.hold) { const k = roadW(OUT_END) / PARK_W; return { y: OUT_END, k, ky: k * (.8 + .2 * k), a: 1 }; }
+    const v = Math.min(1, (T - DRIVE.out - DRIVE.hold) / DRIVE.vanish), k0 = roadW(OUT_END) / PARK_W, ky0 = k0 * (.8 + .2 * k0), mid = OUT_END + BUS_SPRITE.dy * ky0 / 2;
     const f = 1 - v * v, k = k0 * f, ky = ky0 * f;
     return v >= 1 ? null : { y: mid - BUS_SPRITE.dy * ky / 2, k, ky, a: 1 - v * v * v, vanish: true };
   }
@@ -1008,12 +1028,19 @@
     if (MB.phase === 'drive') {
       MB.mix = Math.min(1, MB.t / (DRIVE.inStart + DRIVE.inDur));
       if (MB.t > .02 && MB.t - dt <= .02) SFX.whoosh(false);
-      // a little bank of cloud rolls over the end of the road just before the bus shrinks away behind it
-      if (!MB.cover && MB.t > DRIVE.out - .28) { const k0 = roadW(OUT_END) / PARK_W, ky0 = k0 * (.8 + .2 * k0); MB.cover = { x: ROAD_CX + 2, y: OUT_END + BUS_SPRITE.dy * ky0 / 2, t: 0 }; }
+      // near the end of the road the exhaust thickens and billows up over the bus, which shrinks away inside it
+      const lp0 = leavingPose(); if (lp0) MB.pipe = { x: busX(lp0) + BUS_SPRITE.pipe[0] * lp0.k, y: lp0.y + BUS_SPRITE.pipe[1] * lp0.k, k: roadW(OUT_END) / PARK_W };
+      if (MB.pipe && MB.t > DRIVE.out - .32 && MB.t < DRIVE.out + DRIVE.hold + .1 && (MB.gasT -= dt) <= 0) {
+        // starts at the exhaust pipe, then billows up and around the whole bus as it thickens
+        MB.gasT = .018; const k = MB.pipe.k, u = clamp01((MB.t - (DRIVE.out - .32)) / (.32 + DRIVE.hold)), bw = BUS_SPRITE.w * k, bh = -BUS_SPRITE.dy * k * (.8 + .2 * k);
+        gas.push({ x: MB.pipe.x - BUS_SPRITE.pipe[0] * k * u + (Math.random() - .5) * bw * (.25 + .8 * u), y: MB.pipe.y - Math.random() * bh * (.15 + .95 * u),
+          vx: (Math.random() - .5) * 70 * k, vy: -(40 + Math.random() * 90) * k, r: 4 * k, grow: (24 + Math.random() * 16) * k * (.75 + u * .6), age: 0, life: 1.3 + Math.random() * .45 });
+      }
       if (MB.t > DRIVE.inStart && MB.t - dt <= DRIVE.inStart) SFX.whoosh(true);
       if (MB.t > DRIVE.inStart + DRIVE.inDur) { MB.scene = MB.nextScene; MB.phase = 'idle'; MB.shown = progress; MB.btnPop = 1; MB.mix = 1; SFX.horn(); for (let i = 0; i < 4; i++) addPuff(parkedPose(), 1.3); }
     }
-    if (MB.cover && (MB.cover.t += dt) > 1.7) MB.cover = null;
+    for (const q of gas) { q.age += dt; const damp = Math.pow(.025, dt); q.vx *= damp; q.vy = q.vy * damp - 14 * dt; q.x += q.vx * dt; q.y += q.vy * dt; }
+    for (let i = gas.length - 1; i >= 0; i--) if (gas[i].age > gas[i].life) gas.splice(i, 1);
     // exhaust: gentle at idle, a steady trail while driving
     const lp = leavingPose(), pp = parkedPose();
     if (lp && !lp.vanish && (MB.puffT -= dt) <= 0) { MB.puffT = .09 * (.7 + Math.random() * .6); addPuff(lp, 1.2); }
@@ -1032,12 +1059,15 @@
       r: (2.4 + Math.random() * 1.5) * k * (poof ? 2.2 : 1), grow: (7 + Math.random() * 5) * k * power, age: 0, life: (poof ? .6 : .9) + Math.random() * .5 });
   }
   const busX = p => BUS_X + (ROAD_CX - BUS_X) * (1 - p.k);
-  function drawCover(c) {                                    // three puffs that swell, hold while the bus vanishes, then drift off and fade
-    const grow = u => u <= 0 ? 0 : u >= 1 ? 1 : 1 + 2.4 * Math.pow(u - 1, 3) + 1.4 * Math.pow(u - 1, 2);
-    const out = clamp01((c.t - .75) / .95), dx = out * out * 46, a = 1 - out;
-    [[-14, -26, 1.25, 0], [16, 4, 1.15, .06], [-10, 30, 1.05, .12]].forEach(([ox, oy, s, d]) => {
-      const g = grow((c.t - d) / .32); if (g > 0) drawCloud({ x: c.x + ox + dx * (1 + d * 4), y: c.y + oy - out * 8, s: s * g }, a);
-    });
+  function drawGas() {                                       // thick exhaust: puffy blobs that swell fast, hold, then thin out
+    for (const q of gas) {
+      const k = q.age / q.life, r = q.r + q.grow * (1 - Math.pow(1 - Math.min(1, k * 2.2), 3));
+      ctx.globalAlpha = .93 * Math.min(1, q.age * 7) * (k < .55 ? 1 : 1 - (k - .55) / .45);
+      ctx.fillStyle = 'rgba(214,206,196,1)'; ctx.beginPath(); ctx.arc(q.x + r * .1, q.y + r * .18, r * .95, 0, TAU); ctx.fill();   // soft shade underneath
+      ctx.fillStyle = '#F8F4EE';
+      ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, TAU); ctx.arc(q.x + r * .75, q.y - r * .2, r * .72, 0, TAU); ctx.arc(q.x - r * .65, q.y + r * .25, r * .66, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
   function drawCloud(c, a) {
     ctx.save(); ctx.globalAlpha = a; ctx.translate(c.x, c.y); ctx.scale(c.s, c.s);
@@ -1105,7 +1135,7 @@
     }
     ctx.globalAlpha = 1;
     drawBus(leavingPose());                                   // farther away, so drawn first
-    if (MB.cover) drawCover(MB.cover);
+    drawGas();
     drawBus(parkedPose());
     // HUD from the Figma 'Main Menu' frame
     ctx.drawImage(A.menuTop, 19, 54, 360, 56);
@@ -1134,7 +1164,7 @@
     drawHud();
     drawHearts();
     drawLocks();
-    ctx.drawImage(A.gen, GEN.x - MC[0], GEN.y - MC[1]);
+    if (S.phase !== 'obstacle') ctx.drawImage(A.gen, GEN.x - MC[0], GEN.y - MC[1]);   // hidden until the board comes in
     S.plates.forEach(drawPlate);
 
     if (S.piece) {
