@@ -818,8 +818,8 @@
       if (near(m, MENU_GEAR.x, MENU_GEAR.y, MENU_GEAR.r)) return toggleSound(false);
       if (MENU_PLUS.some(([x, y]) => near(m, x, y, 18))) { SFX.lock(); return showToast('The shop opens in the full game'); }
       if (MENU_ICONS.some(([x, y]) => near(m, x, y, 40))) { SFX.lock(); return showToast('Coming soon'); }
-      if (MB.phase !== 'idle') {                            // tapping during the bus change skips it
-        skipDrive(); return;
+      if (MB.phase !== 'idle') {                            // tapping during the bus change: open the level when it finishes
+        if (!MB.then) { MB.then = startRun; SFX.place(); } return;
       }
       if (m.x > LEVEL_BTN.x && m.x < LEVEL_BTN.x + LEVEL_BTN.w && m.y > LEVEL_BTN.y && m.y < LEVEL_BTN.y + LEVEL_BTN.h && !btnPress) {
         btnPress = 1; SFX.place(); SFX.start();
@@ -1326,6 +1326,7 @@
     // always open on the main menu (also when the preview reloads mid-game)
     S = newRun(); setupStageSilent(0); scene = 'menu';
     endEl.hidden = true; note = null;
+    setTimeout(() => { if (scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.rev(); } }, 900);   // testing: play the bus change on open
   }
   function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
   window.claude?.hot?.snapshot?.(() => ({ S, scene }));
