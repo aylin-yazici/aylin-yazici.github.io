@@ -1022,6 +1022,8 @@
   }
   function updateMenu(dt) {
     MB.t += dt; MB.btnPop = Math.max(0, MB.btnPop - dt * 2.5);
+    // testing: the preview window can stay loaded when it is closed and reopened, so the bus change also repeats on the menu
+    if (MB.phase === 'idle') { if ((MB.idleT = (MB.idleT || 0) + dt) > 4.5) { MB.idleT = 0; openDrive(); } } else MB.idleT = 0;
     if (MB.phase === 'drive') {
       MB.mix = Math.min(1, MB.t / (DRIVE.inStart + DRIVE.inDur));
       if (MB.t > .02 && MB.t - dt <= .02) SFX.whoosh(false);
