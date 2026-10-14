@@ -806,12 +806,10 @@
       if (near(m, MENU_GEAR.x, MENU_GEAR.y, MENU_GEAR.r)) return toggleSound(false);
       if (MENU_PLUS.some(([x, y]) => near(m, x, y, 18))) { SFX.lock(); return showToast('The shop opens in the full game'); }
       if (MENU_ICONS.some(([x, y]) => near(m, x, y, 40))) { SFX.lock(); return showToast('Coming soon'); }
-      if (MB.phase !== 'idle') {                            // tapping during the bus change: open the level when it finishes
-        if (!MB.then) { MB.then = startRun; SFX.place(); } return;
-      }
+      if (MB.phase !== 'idle') skipDrive();                  // tapping during the bus change skips it
       if (m.x > LEVEL_BTN.x && m.x < LEVEL_BTN.x + LEVEL_BTN.w && m.y > LEVEL_BTN.y && m.y < LEVEL_BTN.y + LEVEL_BTN.h && !btnPress) {
         btnPress = 1; SFX.place(); SFX.start();
-        setTimeout(() => { btnPress = 0; MB.then = startRun; menuDrive(); SFX.rev(); }, 180);   // testing: bus change first, then the level
+        setTimeout(() => { btnPress = 0; startRun(); }, 180);
       }
       return;
     }
