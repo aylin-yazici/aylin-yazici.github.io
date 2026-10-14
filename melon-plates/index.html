@@ -823,7 +823,7 @@
       }
       if (m.x > LEVEL_BTN.x && m.x < LEVEL_BTN.x + LEVEL_BTN.w && m.y > LEVEL_BTN.y && m.y < LEVEL_BTN.y + LEVEL_BTN.h && !btnPress) {
         btnPress = 1; SFX.place(); SFX.start();
-        setTimeout(() => { btnPress = 0; startRun(); }, 180);
+        setTimeout(() => { btnPress = 0; MB.then = startRun; menuDrive(); SFX.rev(); }, 180);   // testing: bus change first, then the level
       }
       return;
     }
@@ -1003,7 +1003,7 @@
   const DRIVE = { out: 1.05, hold: .18, vanish: .3, inStart: .97, inDur: 1 };   // hold: the bus waits inside the gas before it shrinks   // seconds
   MB.scene = sceneFor(progress);
   function menuDrive() { Object.assign(MB, { phase: 'drive', t: 0, nextScene: sceneFor(progress), mix: 0, gasT: 0, pipe: null }); }
-  function skipDrive() { if (MB.nextScene) MB.scene = MB.nextScene; Object.assign(MB, { phase: 'idle', shown: progress, mix: 1, btnPop: 1 }); }
+  function skipDrive() { if (MB.nextScene) MB.scene = MB.nextScene; Object.assign(MB, { phase: 'idle', shown: progress, mix: 1, btnPop: 1 }); if (MB.then) { const go = MB.then; MB.then = null; go(); } }
   const OUT_END = 418;                                       // where the leaving bus shrinks away, near the end of the road
   function leavingPose() {                                   // the bus that drives away
     if (MB.phase !== 'drive') return null;
@@ -1037,7 +1037,8 @@
           vx: (Math.random() - .5) * 70 * k, vy: -(40 + Math.random() * 90) * k, r: 4 * k, grow: (24 + Math.random() * 16) * k * (.75 + u * .6), age: 0, life: 1.3 + Math.random() * .45 });
       }
       if (MB.t > DRIVE.inStart && MB.t - dt <= DRIVE.inStart) SFX.whoosh(true);
-      if (MB.t > DRIVE.inStart + DRIVE.inDur) { MB.scene = MB.nextScene; MB.phase = 'idle'; MB.shown = progress; MB.btnPop = 1; MB.mix = 1; SFX.horn(); for (let i = 0; i < 4; i++) addPuff(parkedPose(), 1.3); }
+      if (MB.t > DRIVE.inStart + DRIVE.inDur) { MB.scene = MB.nextScene; MB.phase = 'idle'; MB.shown = progress; MB.btnPop = 1; MB.mix = 1; SFX.horn(); for (let i = 0; i < 4; i++) addPuff(parkedPose(), 1.3);
+        if (MB.then) { const go = MB.then; MB.then = null; setTimeout(go, 450); } }
     }
     for (const q of gas) { q.age += dt; const damp = Math.pow(.025, dt); q.vx *= damp; q.vy = q.vy * damp - 14 * dt; q.x += q.vx * dt; q.y += q.vy * dt; }
     for (let i = gas.length - 1; i >= 0; i--) if (gas[i].age > gas[i].life) gas.splice(i, 1);
@@ -1327,7 +1328,6 @@
       S = data.S; scene = 'game'; S.piece = null; [GEN.x, GEN.y] = STAGES[S.stage].board ? STAGES[S.stage].board.gen : LEVEL_GEN; setTimeout(spawnPiece, 50);
     } else {
       S = newRun(); setupStageSilent(0); scene = 'menu';
-      setTimeout(() => { if (scene === 'menu' && MB.phase === 'idle') menuDrive(); }, 1200);   // testing: play the bus change on every start
     }
     endEl.hidden = true; note = null;
   }
