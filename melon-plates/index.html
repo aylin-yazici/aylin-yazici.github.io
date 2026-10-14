@@ -931,7 +931,8 @@
   const SKY_TINTS = [null, ['255,190,150', .16], ['255,240,170', .1], ['200,180,255', .14], ['255,210,120', .18], ['170,220,255', .12]];
   function sceneFor(level) {
     let s = level * 9301 + 49297; const r = () => (s = (s * 233280 + 49297) % 233280 + 1) / 233281;
-    const clouds = [...Array(2 + (level % 3))].map(() => ({ x: r() * 440 - 20, y: 40 + r() * 170, s: .55 + r() * .6, v: 3 + r() * 5 }));
+    const n = 2 + (level % 3);      // in the open sky under the top bar, spread across the width
+    const clouds = [...Array(n)].map((_, i) => ({ x: (i + .2 + r() * .6) / n * 440 - 20, y: 128 + r() * 38, s: .6 + r() * .3, v: 3 + r() * 4 }));
     return { tint: SKY_TINTS[(level - 1) % SKY_TINTS.length], clouds, balloon: level % 3 === 0 ? { x: 60 + r() * 280, y: 150 + r() * 60, hue: Math.floor(r() * 360) } : null, birdsAt: 2 + r() * 5 };
   }
   let progress = 1;
@@ -942,11 +943,11 @@
   // the next bus rolls in from the bottom and parks. Same bus art; the camera never moves.
   const MB = { phase: 'idle', t: 0, shown: progress, scene: null, nextScene: null, mix: 1, puffT: 0, puffT2: 0, btnPop: 0, birds: null, birdT: 0, poofed: false };
   const puffs = [];
-  const DRIVE = { out: .8, vanish: .3, inStart: .72, inDur: 1 };   // seconds
+  const DRIVE = { out: 1.05, vanish: .3, inStart: .97, inDur: 1 };   // seconds
   MB.scene = sceneFor(progress);
   function menuDrive() { Object.assign(MB, { phase: 'drive', t: 0, nextScene: sceneFor(progress), mix: 0, poofed: false }); }
   function skipDrive() { if (MB.nextScene) MB.scene = MB.nextScene; Object.assign(MB, { phase: 'idle', shown: progress, mix: 1, btnPop: 1 }); }
-  const OUT_END = 548;                                       // where the leaving bus shrinks away, well before the crest
+  const OUT_END = 418;                                       // where the leaving bus shrinks away, near the end of the road
   function leavingPose() {                                   // the bus that drives away
     if (MB.phase !== 'drive') return null;
     const T = MB.t;
@@ -992,7 +993,7 @@
   }
   const busX = p => BUS_X + (ROAD_CX - BUS_X) * (1 - p.k);
   function drawCloud(c, a) {
-    ctx.save(); ctx.globalAlpha = a * .9; ctx.translate(c.x, c.y); ctx.scale(c.s, c.s);
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(c.x, c.y); ctx.scale(c.s, c.s);
     ctx.fillStyle = 'rgba(255,255,255,.95)';
     for (const [x, y, r] of [[-28, 6, 16], [-8, -6, 22], [16, -2, 18], [34, 8, 13], [4, 10, 18]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
     ctx.fillStyle = 'rgba(190,225,250,.45)'; ctx.beginPath(); ctx.ellipse(4, 20, 40, 7, 0, 0, TAU); ctx.fill();
