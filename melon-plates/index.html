@@ -1198,12 +1198,6 @@
     // only the sky, far town and far forest are kept; the near trees of the old painting give way to the strip
     mx.fillStyle = '#000'; mx.fillRect(0, 0, W, 360);
     let g = mx.createLinearGradient(0, 360, 0, 377); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)'); mx.fillStyle = g; mx.fillRect(0, 360, W, 17);
-    // the crest of the bridge reaches a little lower, soft on every side
-    const br = document.createElement('canvas'); br.width = m.width; br.height = m.height; const bx = br.getContext('2d'); bx.scale(sc, sc);
-    g = bx.createLinearGradient(0, 392, 0, 404); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)'); bx.fillStyle = '#000'; bx.fillRect(106, 356, 190, 36); bx.fillStyle = g; bx.fillRect(106, 392, 190, 12);
-    bx.globalCompositeOperation = 'destination-in'; g = bx.createLinearGradient(106, 0, 296, 0);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(.06, '#000'); g.addColorStop(.94, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)'); bx.fillStyle = g; bx.fillRect(106, 356, 190, 48);
-    mx.setTransform(1, 0, 0, 1, 0, 0); mx.drawImage(br, 0, 0);
     cx.globalCompositeOperation = 'destination-in'; cx.drawImage(m, 0, 0);
     groundTex = { c, cap };
   }
@@ -1233,6 +1227,32 @@
       ctx.drawImage(groundCache.c, 0, GROUND_TOP, W, H - GROUND_TOP);
     }
     ctx.drawImage(groundTex.cap, 0, 0, W, 410);
+  }
+  // a bank of puffy clouds along the horizon: the bridge runs off into it, and it hides where the road strip meets
+  // the painted forest. Puffs drift slowly and wrap around; the bank is seeded so it looks the same every visit.
+  const BANK_W = W + 160;
+  const BANK = (() => { let sd = 11; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647, p = [];
+    // back row: tall soft heads at uneven heights; front row: smaller puffs along the lower edge
+    for (let x = 0; x < BANK_W;) { const rr = 16 + r() * 22; p.push({ x, y: 366 + r() * 12 - (rr - 16) * .25, r: rr, back: true }); x += rr * (1.05 + r() * .5); }
+    for (let x = 10; x < BANK_W;) { const rr = 11 + r() * 11; p.push({ x, y: 390 + r() * 7, r: rr }); x += rr * (1.2 + r() * .6); }
+    return p; })();
+  function drawCloudBank(world) {
+    const off = t * 3 + world * 5;
+    const xs = q => ((q.x + off * (q.back ? 1 : 1.5)) % BANK_W + BANK_W) % BANK_W - 80;
+    ctx.save();
+    let g = ctx.createLinearGradient(0, 388, 0, 440); g.addColorStop(0, 'rgba(235,245,255,.55)'); g.addColorStop(1, 'rgba(235,245,255,0)');   // mist settling on the ground
+    ctx.fillStyle = g; ctx.fillRect(0, 388, W, 52);
+    const puff = (q, dy, shade) => {
+      const x = xs(q), y = q.y + dy, rg = ctx.createRadialGradient(x - q.r * .3, y - q.r * .4, q.r * .1, x, y, q.r * 1.05);
+      rg.addColorStop(0, '#FFFFFF'); rg.addColorStop(.6, shade ? '#EAF2FB' : '#F4F8FD'); rg.addColorStop(1, shade ? '#BFD3EA' : '#D7E5F4');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, q.r, 0, TAU); ctx.fill();
+    };
+    // a soft core so no gap shows between the heads
+    g = ctx.createLinearGradient(0, 368, 0, 398); g.addColorStop(0, '#EEF4FB'); g.addColorStop(1, '#D3E2F2');
+    ctx.fillStyle = g; ctx.fillRect(0, 370, W, 26);
+    for (const q of BANK) if (q.back) puff(q, 0, true);
+    for (const q of BANK) if (!q.back) puff(q, 0, false);
+    ctx.restore();
   }
   const DRIVE3D = { dur: 3.2, dist: 5 };
   const travelAt = T => { const p = clamp01(T / DRIVE3D.dur); return DRIVE3D.dist * (p - Math.sin(TAU * p) / TAU); };
@@ -1434,6 +1454,7 @@
     const riding = MB.phase === 'drive' && !MB.mass, world = MB.world + (riding ? travelAt(MB.t) : 0);
     drawGround(world, riding);
     drawDashes(world);
+    drawCloudBank(world);
     drawSceneExtras(MB.scene, MB.phase === 'drive' ? 1 - MB.mix : 1);
     if (MB.phase === 'drive') drawSceneExtras(MB.nextScene, MB.mix);
     if (MB.birds) drawBirds(MB.birds);
