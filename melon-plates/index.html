@@ -1247,7 +1247,10 @@
     // resume only a game that was mid-play in this same version; anything else starts at the menu
     if (data && data.S && data.S.v === VERSION && data.scene === 'game' && data.S.phase === 'play' && !data.S.piece?.hint) {
       S = data.S; scene = 'game'; S.piece = null; [GEN.x, GEN.y] = STAGES[S.stage].board ? STAGES[S.stage].board.gen : LEVEL_GEN; setTimeout(spawnPiece, 50);
-    } else { S = newRun(); setupStageSilent(0); scene = 'menu'; }
+    } else {
+      S = newRun(); setupStageSilent(0); scene = 'menu';
+      setTimeout(() => { if (scene === 'menu' && MB.phase === 'idle') menuDrive(); }, 1200);   // testing: play the bus change on every start
+    }
     endEl.hidden = true; note = null;
   }
   function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
