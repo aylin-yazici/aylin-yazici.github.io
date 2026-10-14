@@ -1185,13 +1185,19 @@
   const railInR = y => { const u = (y - 600) / 100; return 287.499 + 12.492 * u - .436 * u * u; };
   let roadGL = null;
   // what stays put while riding: the sky, town and bridge top above the crest, and the painted railings
-  const SIDE_TOP = 376, CAP_END = 392;
+  const SIDE_TOP = 344, CAP_END = 392, HAZE_Y = 350;     // the sides rise out of the haze at HAZE_Y
   const tubeW = y => 18 * (145 + .2679 * (y - 455)) / 257;
   function makeOverlay() {
     const bg = A.menuBg, sc = bg.width / W, c = document.createElement('canvas'); c.width = bg.width; c.height = bg.height;
     const m = document.createElement('canvas'); m.width = c.width; m.height = c.height; const mx = m.getContext('2d'); mx.scale(sc, sc);
-    mx.fillStyle = '#000'; mx.fillRect(0, 0, W, CAP_END);
-    const g = mx.createLinearGradient(0, CAP_END, 0, CAP_END + 12); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)'); mx.fillStyle = g; mx.fillRect(0, CAP_END, W, 12);
+    // sky, town and the haze above HAZE_Y, softly
+    mx.fillStyle = '#000'; mx.fillRect(0, 0, W, HAZE_Y);
+    let g = mx.createLinearGradient(0, HAZE_Y, 0, HAZE_Y + 10); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)'); mx.fillStyle = g; mx.fillRect(0, HAZE_Y, W, 10);
+    // the bridge top (arches) down to CAP_END, cut along the outside of the arches
+    const Lp = [[166, 336], [160, 348], [151, 354], [147, 362], [143.5, 372], [140.5, 382], [137.5, 392], [135, 402], [133.5, 412]];
+    mx.save(); mx.beginPath(); Lp.forEach(([px, py], i) => i ? mx.lineTo(px - 1.5, py) : mx.moveTo(px - 1.5, py)); [...Lp].reverse().forEach(([px, py]) => mx.lineTo(403 - px + 1.5, py)); mx.closePath(); mx.clip();
+    g = mx.createLinearGradient(0, CAP_END, 0, CAP_END + 12); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    mx.fillStyle = '#000'; mx.fillRect(0, 330, W, CAP_END - 330); mx.fillStyle = g; mx.fillRect(0, CAP_END, W, 12); mx.restore();
     mx.fillStyle = '#000';
     for (const side of [-1, 1]) {                            // a band along each railing, from inside the tube to just past it
       mx.beginPath();
@@ -1200,7 +1206,10 @@
       mx.closePath(); mx.fill();
     }
     const x = c.getContext('2d'); x.drawImage(bg, 0, 0); x.globalCompositeOperation = 'destination-in'; x.drawImage(m, 0, 0);
-    return c;
+    // under the moving sides: the haze colour carried down, so new scenery comes out of the mist
+    const hz = document.createElement('canvas'); hz.width = 16; hz.height = 1; const hx = hz.getContext('2d'); hx.imageSmoothingQuality = 'high';
+    hx.drawImage(bg, 0, (HAZE_Y - 8) * sc, bg.width, 6 * sc, 0, 0, 16, 1);
+    return { c, hz };
   }
   function makeRoadGL() {
     const c = document.createElement('canvas');
@@ -1239,7 +1248,7 @@
     for (const side of [-1, 1]) {
       let n = 0, prev = null;
       for (let y = SIDE_TOP; y <= H + 2; y += 2) {
-        const rw = roadW(y), rc = ROAD_C(y), a = alpha * clamp01((y - SIDE_TOP) / 10), t = (uAt(y) - s - SIDE_U0) / TILE;
+        const rw = roadW(y), rc = ROAD_C(y), e = clamp01((y - HAZE_Y) / 34), a = alpha * e * e * (3 - 2 * e), t = (uAt(y) - s - SIDE_U0) / TILE;
         const xs = side < 0 ? [-6, railInL(y) - tubeW(y) + 1] : [railInR(y) + tubeW(y) - 1, W + 6];
         const cur = xs.map(x => [x, y - SIDE_TOP, (Math.abs(x - rc) / rw - SIDE_L0) / (SIDE_L1 - SIDE_L0), t, a]);
         if (prev) for (const v of [prev[0], prev[1], cur[0], prev[1], cur[1], cur[0]]) { d.set(v, n); n += 5; }
@@ -1280,10 +1289,11 @@
     const alpha = clamp01(Math.min(MB.t / .3, (DRIVE3D.dur - MB.t) / .35));   // eases in and out of the still painting
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     drawSides(R, travel, alpha); drawRoad(R, travel, alpha);
+    ctx.save(); ctx.globalAlpha = alpha; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(overlay.hz, 0, HAZE_Y, W, 420 - HAZE_Y); ctx.restore();
     ctx.drawImage(R.c, 0, SIDE_TOP, W, H - SIDE_TOP);
-    ctx.drawImage(overlay, 0, 0, W, IHs);
+    ctx.drawImage(overlay.c, 0, 0, W, IHs);
   }
-  const DRIVE3D = { dur: 4.2, dist: TILE };
+  const DRIVE3D = { dur: 6, dist: TILE };
   const travelAt = T => { const p = clamp01(T / DRIVE3D.dur); return DRIVE3D.dist * (p - Math.sin(TAU * p) / TAU); };
   const travelSpeed = T => { const p = clamp01(T / DRIVE3D.dur); return DRIVE3D.dist / DRIVE3D.dur * (1 - Math.cos(TAU * p)); };
   function makeBusSkins() {}                                // the bus keeps its painted colours
