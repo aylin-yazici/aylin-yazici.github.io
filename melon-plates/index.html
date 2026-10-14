@@ -1339,8 +1339,12 @@
     // always open on the main menu (also when the preview reloads mid-game)
     S = newRun(); setupStageSilent(0); scene = 'menu';
     endEl.hidden = true; note = null;
-    setTimeout(() => { if (scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.rev(); } }, 900);   // testing: play the bus change on open
+    setTimeout(openDrive, 900);
   }
+  // testing: the bus change plays every time the game is opened or brought back to the screen
+  function openDrive() { if (scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.rev(); } }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(openDrive, 600); });
+  addEventListener('pageshow', e => { if (e.persisted) setTimeout(openDrive, 600); });
   function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
   window.claude?.hot?.snapshot?.(() => ({ S, scene }));
 
