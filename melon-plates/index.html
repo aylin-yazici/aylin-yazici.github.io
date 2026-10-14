@@ -1179,8 +1179,13 @@
   // The ground below the crest is a seamless top-down strip (road down the middle, houses and trees either side),
   // laid into the painting's perspective row by row: one strip curb block = one painted curb block deep, and the
   // railings sit where the painting has them. Moving the camera just slides the strip.
-  const STRIP = { block: 89.3, cx: 511.25, rails: 339.5, h: 1536, pad: 200 }, DASH_U = 2, GROUND_TOP = 352;
-  const railGap = y => 145 + .2679 * (y - 455), railMid = y => 201.9 - .00475 * (y - 475);
+  const STRIP = { block: 89.3, cx: 511.25, rails: 339.5, h: 1536, pad: 200 }, DASH_U = 2, GROUND_TOP = 336;
+  const railMid = y => 201.9 - .00475 * (y - 475);
+  // near the top the railings follow the painted arches inward, so the ground curves away over the hump with them
+  const ARCH = [[340, 172], [346, 168], [352, 160], [358, 154], [366, 150], [376, 146], [386, 142.5], [396, 139.5], [404, 136.3]];
+  const railGap = y => { if (y >= 404) return 145 + .2679 * (y - 455);
+    let i = 1; while (i < ARCH.length - 1 && y > ARCH[i][0]) i++; const [y0, a0] = ARCH[i - 1], [y1, a1] = ARCH[i];
+    return 2 * (railMid(y) - (a0 + (a1 - a0) * (Math.max(y, 340) - y0) / (y1 - y0))); };
   let groundTex = null, groundCache = null;
   function makeGround() {
     const im = A.roadStrip, P = STRIP.pad, c = document.createElement('canvas');
@@ -1191,68 +1196,70 @@
       x.save(); x.translate(P, oy); x.scale(-1, 1); x.drawImage(im, 0, 0, P, im.height, 0, 0, P, im.height); x.restore();       // mirrored scenery out past the edges
       x.save(); x.translate(P + im.width + P, oy); x.scale(-1, 1); x.drawImage(im, im.width - P, 0, P, im.height, 0, 0, P, im.height); x.restore();
     }
-    // the painting's sky, far town and the bridge crest stay on top, fading out where they meet the ground
-    const bg = A.menuBg, sc = bg.width / W, cap = document.createElement('canvas'); cap.width = bg.width; cap.height = Math.round(410 * sc);
-    const cx = cap.getContext('2d'); cx.drawImage(bg, 0, 0, bg.width, cap.height, 0, 0, bg.width, cap.height);
-    const m = document.createElement('canvas'); m.width = cap.width; m.height = cap.height; const mx = m.getContext('2d'); mx.scale(sc, sc);
-    // only the sky, far town and far forest are kept; the near trees of the old painting give way to the strip
-    mx.fillStyle = '#000'; mx.fillRect(0, 0, W, 360);
-    let g = mx.createLinearGradient(0, 360, 0, 377); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)'); mx.fillStyle = g; mx.fillRect(0, 360, W, 17);
-    cx.globalCompositeOperation = 'destination-in'; cx.drawImage(m, 0, 0);
-    groundTex = { c, cap };
+    // smaller copies for the far rows, so squeezed scenery stays smooth instead of shimmering
+    const mips = [c];
+    for (let i = 1; i < 4; i++) { const p = mips[i - 1], m = document.createElement('canvas'); m.width = Math.ceil(p.width / 2); m.height = Math.ceil(p.height / 2);
+      const mx = m.getContext('2d'); mx.imageSmoothingQuality = 'high'; mx.drawImage(p, 0, 0, m.width, m.height); mips.push(m); }
+    groundTex = { mips, hill: makeHill(), crest: makeCrest() };
   }
-  function drawGroundRows(g, world) {
-    const { c } = groundTex, BH = 2, P = STRIP.pad;
+  // the painted top of the bridge (railings arching over the hump), cut tight along the outside of the railings
+  // and fading out downward where the strip's own road takes over
+  function makeCrest() {
+    const bg = A.menuBg, sc = bg.width / W, c = document.createElement('canvas'); c.width = bg.width; c.height = Math.round(412 * sc);
+    const x = c.getContext('2d'); x.scale(sc, sc);
+    const Lp = [[166, 336], [160, 348], [151, 354], [147, 362], [143.5, 372], [140.5, 382], [137.5, 392], [135, 402], [133.5, 412]];
+    x.beginPath(); Lp.forEach(([px, py], i) => i ? x.lineTo(px - 1, py) : x.moveTo(px - 1, py)); [...Lp].reverse().forEach(([px, py]) => x.lineTo(403 - px + 1, py)); x.closePath(); x.clip();
+    x.drawImage(bg, 0, 0, bg.width, c.height, 0, 0, W, 412);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'destination-in';
+    const g = x.createLinearGradient(0, 394 * sc, 0, 410 * sc); g.addColorStop(0, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+    return c;
+  }
+  // the top of the hill the bridge runs over: smooth where the road crests, a row of treetops either side
+  function makeHill() {
+    const base = x => 348 + 12 * Math.pow((x - 201) / 201, 2);
+    let sd = 5; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647, crowns = [];
+    for (let x = -10; x < W + 10;) { const rr = 6 + r() * 7; if (Math.abs(x - 201.5) > 60) crowns.push([x, rr]); x += rr * (1.3 + r() * .5); }
+    const path = new Path2D(); path.moveTo(0, H); path.lineTo(0, base(0));
+    for (let x = 0; x <= W; x += 1.5) {
+      let up = 0; for (const [cx, rr] of crowns) { const d = Math.abs(x - cx); if (d < rr) up = Math.max(up, Math.sqrt(rr * rr - d * d) - rr * .35); }
+      path.lineTo(x, base(x) - up);
+    }
+    path.lineTo(W, H); path.closePath();
+    return path;
+  }
+  function drawGroundRows(g, world, px) {
+    const { mips } = groundTex, BH = 2, P = STRIP.pad;
+    g.save(); g.clip(groundTex.hill);
     for (let y = GROUND_TOP; y < H; y += BH) {
       const k = railGap(y) / STRIP.rails, wu = uAt(y) - world;
       const sy = ((wu * STRIP.block) % STRIP.h + STRIP.h) % STRIP.h, sh = BH * STRIP.block / blockLen(y);
-      g.drawImage(c, 0, sy, c.width, sh, railMid(y) - (STRIP.cx + P) * k, y, c.width * k, BH + .6);
+      const squeeze = Math.max(sh / BH, 1 / k) / px, lv = Math.max(0, Math.min(3, Math.floor(Math.log2(squeeze * 1.1)))), f = 1 / (1 << lv), c = mips[lv];
+      g.drawImage(c, 0, sy * f, c.width, sh * f, railMid(y) - (STRIP.cx + P) * k, y, (STRIP.cx * 2 + 2 * P) * k, BH + .6);
     }
-    const hz = g.createLinearGradient(0, GROUND_TOP, 0, 430);        // distance haze, the painting's own blue-green
-    hz.addColorStop(0, 'rgba(96,190,170,.75)'); hz.addColorStop(.35, 'rgba(110,196,175,.32)'); hz.addColorStop(1, 'rgba(120,200,180,0)');
-    g.fillStyle = hz; g.fillRect(0, GROUND_TOP, W, 430 - GROUND_TOP);
+    const hz = g.createLinearGradient(0, 345, 0, 415);              // distance haze in the painting's own blue-green
+    hz.addColorStop(0, 'rgba(110,200,185,.62)'); hz.addColorStop(.4, 'rgba(120,205,190,.25)'); hz.addColorStop(1, 'rgba(130,210,195,0)');
+    g.fillStyle = hz; g.fillRect(0, 340, W, 75);
+    g.restore();
+    g.save(); g.strokeStyle = 'rgba(40,110,95,.35)'; g.lineWidth = 1.2; g.clip(groundTex.hill); g.stroke(groundTex.hill); g.restore();   // a soft edge on the treetops
   }
-  // the ground and the crest for the camera at `world` blocks along the road; the still view is cached
+  // the painting's sky, town and far forest, then the ground over the hill; the still view is cached
   function drawGround(world, moving) {
     if (!groundTex) makeGround();
-    if (moving) drawGroundRows(ctx, world);
+    ctx.drawImage(A.menuBg, 0, 0, W, W * A.menuBg.height / A.menuBg.width);
+    const px = scale * dpr;
+    if (moving) drawGroundRows(ctx, world, px);
     else {
-      const px = scale * dpr, key = world + ':' + px;
+      const key = world + ':' + px;
       if (!groundCache || groundCache.key !== key) {
         const cv2 = groundCache ? groundCache.c : document.createElement('canvas');
         cv2.width = Math.ceil(W * px); cv2.height = Math.ceil((H - GROUND_TOP) * px);
         const g = cv2.getContext('2d'); g.setTransform(px, 0, 0, px, 0, -GROUND_TOP * px); g.imageSmoothingQuality = 'high';
-        drawGroundRows(g, world); groundCache = { key, c: cv2 };
+        drawGroundRows(g, world, px); groundCache = { key, c: cv2 };
       }
       ctx.drawImage(groundCache.c, 0, GROUND_TOP, W, H - GROUND_TOP);
     }
-    ctx.drawImage(groundTex.cap, 0, 0, W, 410);
-  }
-  // a bank of puffy clouds along the horizon: the bridge runs off into it, and it hides where the road strip meets
-  // the painted forest. Puffs drift slowly and wrap around; the bank is seeded so it looks the same every visit.
-  const BANK_W = W + 160;
-  const BANK = (() => { let sd = 11; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647, p = [];
-    // back row: tall soft heads at uneven heights; front row: smaller puffs along the lower edge
-    for (let x = 0; x < BANK_W;) { const rr = 16 + r() * 22; p.push({ x, y: 366 + r() * 12 - (rr - 16) * .25, r: rr, back: true }); x += rr * (1.05 + r() * .5); }
-    for (let x = 10; x < BANK_W;) { const rr = 11 + r() * 11; p.push({ x, y: 390 + r() * 7, r: rr }); x += rr * (1.2 + r() * .6); }
-    return p; })();
-  function drawCloudBank(world) {
-    const off = t * 3 + world * 5;
-    const xs = q => ((q.x + off * (q.back ? 1 : 1.5)) % BANK_W + BANK_W) % BANK_W - 80;
-    ctx.save();
-    let g = ctx.createLinearGradient(0, 388, 0, 440); g.addColorStop(0, 'rgba(235,245,255,.55)'); g.addColorStop(1, 'rgba(235,245,255,0)');   // mist settling on the ground
-    ctx.fillStyle = g; ctx.fillRect(0, 388, W, 52);
-    const puff = (q, dy, shade) => {
-      const x = xs(q), y = q.y + dy, rg = ctx.createRadialGradient(x - q.r * .3, y - q.r * .4, q.r * .1, x, y, q.r * 1.05);
-      rg.addColorStop(0, '#FFFFFF'); rg.addColorStop(.6, shade ? '#EAF2FB' : '#F4F8FD'); rg.addColorStop(1, shade ? '#BFD3EA' : '#D7E5F4');
-      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, q.r, 0, TAU); ctx.fill();
-    };
-    // a soft core so no gap shows between the heads
-    g = ctx.createLinearGradient(0, 368, 0, 398); g.addColorStop(0, '#EEF4FB'); g.addColorStop(1, '#D3E2F2');
-    ctx.fillStyle = g; ctx.fillRect(0, 370, W, 26);
-    for (const q of BANK) if (q.back) puff(q, 0, true);
-    for (const q of BANK) if (!q.back) puff(q, 0, false);
-    ctx.restore();
+    ctx.drawImage(groundTex.crest, 0, 0, W, 412);
   }
   const DRIVE3D = { dur: 3.2, dist: 5 };
   const travelAt = T => { const p = clamp01(T / DRIVE3D.dur); return DRIVE3D.dist * (p - Math.sin(TAU * p) / TAU); };
@@ -1431,7 +1438,7 @@
   }
   const DASH_U0 = uAt(684);                                 // a dash starts at y 684 in the painting
   function drawDashes(s) {
-    for (let y = CREST + 1; y < H; y++) {
+    for (let y = 400; y < H; y++) {
       if ((((uAt(y) - s - DASH_U0) % DASH_U) + DASH_U) % DASH_U > .406 * DASH_U) continue;
       const w = roadW(y) * .063, k = (y - CREST) / (H - CREST);
       ctx.fillStyle = `rgb(254,${Math.round(244 - 18 * k)},${Math.round(207 - 25 * k)})`;
@@ -1454,7 +1461,6 @@
     const riding = MB.phase === 'drive' && !MB.mass, world = MB.world + (riding ? travelAt(MB.t) : 0);
     drawGround(world, riding);
     drawDashes(world);
-    drawCloudBank(world);
     drawSceneExtras(MB.scene, MB.phase === 'drive' ? 1 - MB.mix : 1);
     if (MB.phase === 'drive') drawSceneExtras(MB.nextScene, MB.mix);
     if (MB.birds) drawBirds(MB.birds);
