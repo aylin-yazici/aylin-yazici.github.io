@@ -514,7 +514,6 @@
     if (p.ice) drawIce(p.slots, 1 - (p.iceIn || 0));
     else if (p.iceBreak > 0) drawIce(p.slots, p.iceBreak, 1 + (1 - p.iceBreak) * .25);
     if (p.lid) drawShutter(shutterK(p.lidOpen, p.shT), p.rattle);
-    if (p.only) drawOnlyBadge(p.only);
     ctx.restore();
   }
   // ---------- spinning plate: a golden turntable under the plate and a turn badge on its rim ----------
@@ -546,25 +545,9 @@
     ctx.rotate(a); ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; spinIcon(7, 2.6);
     ctx.restore();
   }
-  // ---------- fruit plate: the rim takes the fruit's colour, faint slices show the fruit and a badge says which one ----------
-  const ONLY = { m: { tint: '#FF9C9C', wash: '#FFE6E2', ring: '#F0504F', name: 'Melons' }, l: { tint: '#FFD65C', wash: '#FFF4CF', ring: '#F2A20F', name: 'Lemons' },
-                 k: { tint: '#B5E07A', wash: '#EEF8DC', ring: '#5FAE2E', name: 'Kiwis' } };
-  function drawOnly(f) {
-    const o = ONLY[f], [cx, cy] = FRUIT_C;
-    ctx.save(); ctx.globalCompositeOperation = 'multiply';
-    ctx.beginPath(); ctx.arc(cx, cy, 61, 0, TAU); ctx.fillStyle = o.wash; ctx.fill();                       // the plate's face, lightly
-    ctx.beginPath(); ctx.arc(cx, cy, 68.5, 0, TAU); ctx.arc(cx, cy, 61, 0, TAU, true); ctx.fillStyle = o.tint; ctx.fill('evenodd');   // the rim
-    ctx.restore();
-    for (let j = 0; j < 6; j++) drawSlice(0, 0, f, j, 1, .18);                                    // ghost slices show what goes here
-  }
-  function drawOnlyBadge(f) {
-    const o = ONLY[f], im = A[ICONS[f]];
-    ctx.save(); ctx.translate(48, -50);
-    ctx.fillStyle = 'rgba(60,40,10,.25)'; ctx.beginPath(); ctx.arc(1, 3, 16, 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fillStyle = '#FFFBF5'; ctx.fill(); ctx.lineWidth = 3.5; ctx.strokeStyle = o.ring; ctx.stroke();
-    ctx.scale(.7, .7); ctx.drawImage(im, -im.width / 2, -im.height / 2);
-    ctx.restore();
-  }
+  // ---------- fruit plate: a plain plate with faint slices of its fruit printed in the empty spots ----------
+  const ONLY = { m: 'Melons', l: 'Lemons', k: 'Kiwis' };
+  function drawOnly(f) { for (let j = 0; j < 6; j++) drawSlice(0, 0, f, j, 1, .26); }
   // ---------- bee: hovers over a plate and blocks it; after every move it flies to the plate you just used ----------
   function drawBeeAt(x, y, dir = 1, s = 1) {
     ctx.save(); ctx.translate(x, y); ctx.scale(s * dir, s); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -787,8 +770,8 @@
         const bob = Math.sin(t * 4.2) * 3;
         ctx.save(); ctx.globalAlpha = .22; ctx.fillStyle = '#3C2A0A'; ctx.beginPath(); ctx.ellipse(FRUIT_C[0], FRUIT_C[1] + 18, 17, 5, 0, 0, TAU); ctx.fill(); ctx.restore();
         drawBeeAt(FRUIT_C[0], FRUIT_C[1] - 10 + bob, 1, 1.15); } },
-    only: { title: 'Fruit Plate', word: 'FRUIT PLATE', lines: ['A FRUIT PLATE only takes', 'the fruit on its badge!'],
-      demo() { ctx.drawImage(A.plate, -MC[0], -MC[1]); drawOnly('l'); [1, 1, 0, 0, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'l', j); }); drawOnlyBadge('l'); } },
+    only: { title: 'Fruit Plate', word: 'FRUIT PLATE', lines: ['A FRUIT PLATE only takes', 'the fruit printed on it!'],
+      demo() { ctx.drawImage(A.plate, -MC[0], -MC[1]); drawOnly('l'); [1, 1, 0, 0, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'l', j); }); } },
   };
   // drop-in: falls from above with a little bounce and fades in
   const dropIn = (k, start) => { const u = clamp01((k - start) / .45); return { u, dy: -(1 - back(u)) * 70, a: clamp01(u * 2.5) }; };
@@ -1499,7 +1482,7 @@
       SFX.lift();
     } else {
       p.shake = 1; S.combo = 0;
-      if (p.only && p.only !== S.piece.fruit) showToast(ONLY[p.only].name + ' only!', p.x, p.y);
+      if (p.only && p.only !== S.piece.fruit) showToast(ONLY[p.only] + ' only!', p.x, p.y);
       if (!S.livesShown) SFX.nope(); else loseLife();
     }
   });
