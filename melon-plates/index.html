@@ -187,7 +187,7 @@
       spiders: [[0, 1], [2, 0], [5, 4]],
       pre: [['m',[1,1,0,0,0,0]], ['k',[0,0,1,1,0,0]], [null,E], ['k',[1,1,1,0,0,0]], ['m',[0,0,1,1,1,0],'ice'], ['m',[0,0,0,0,1,1]]],
       script: [] },
-    // fruit plate: only takes one fruit, shown by its tint and badge ('onlyM', 'onlyL', 'onlyK')
+    // fruit plate: only takes one fruit, shown by faint slices of it ('onlyM', 'onlyL', 'onlyK')
     { n: 4, goals: { m: 12, l: 12 }, hintDelay: 1.5, pFit: 1, obstIntro: 'only', intro: '',
       pre: [[null,E,'onlyL'], ['m',[1,1,1,0,0,0]], ['l',[1,1,1,1,0,0]], [null,E]],
       script: [{ fruit:'l', start:0, size:3, hint:0, tip: 'This plate only takes\nlemons!' },
@@ -196,8 +196,17 @@
     { n: 6, goals: { m: 18, l: 12, k: 12 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true,
       pre: [[null,E,'onlyM'], ['l',[0,0,1,1,0,0]], ['k',[1,1,0,0,0,0],'onlyK'], [null,E], ['m',[0,1,1,0,0,0]], [null,E,'onlyL']],
       script: [] },
+    // chained plates (`chains`: pairs of neighbouring plates): a full one waits for its partner, then both are served together and the chain snaps
+    { n: 4, goals: { m: 18, l: 12 }, hintDelay: 1.5, pFit: 1, obstIntro: 'chain', intro: '', chains: [[0, 2]],
+      pre: [['m',[1,1,1,1,0,0]], ['l',[1,1,1,1,0,0]], ['m',[1,1,1,0,0,0]], [null,E]],
+      script: [{ fruit:'m', start:4, size:2, hint:0, tip: 'Chained plates wait\nfor each other' },
+               { fruit:'m', start:3, size:3, hint:2, tip: 'Fill the other one to\nserve them both!' },
+               { fruit:'l', start:4, size:2, hint:1 }] },
+    { n: 6, goals: { m: 18, l: 12, k: 12 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true, chains: [[0, 1], [3, 4]],
+      pre: [['m',[1,1,1,0,0,0]], ['l',[0,0,1,1,0,0]], [null,E], ['k',[1,1,0,0,0,0]], ['k',[0,0,0,1,1,1]], ['m',[0,1,1,0,0,0]]],
+      script: [] },
   ];
-  const STAGE_NAMES = ['Tutorial', 'Lemon', 'Ice intro', 'Ice level', 'Kiwi', 'Three fruits', 'Spin intro', 'Spin level', 'Shutter intro', 'Shutter level', 'Spider intro', 'Spider level', 'Fruit plate intro', 'Fruit plate level'];
+  const STAGE_NAMES = ['Tutorial', 'Lemon', 'Ice intro', 'Ice level', 'Kiwi', 'Three fruits', 'Spin intro', 'Spin level', 'Shutter intro', 'Shutter level', 'Spider intro', 'Spider level', 'Fruit plate intro', 'Fruit plate level', 'Chain intro', 'Chain level'];
   // test playgrounds (test menu only): never change the saved level
   const PLAYGROUNDS = {
     ice: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Ice playground',
@@ -210,7 +219,9 @@
       pre: [['m',[1,1,0,0,0,0]], ['l',[0,1,1,0,0,0]], [null,E], ['m',[0,0,1,1,1,0]], ['l',[1,0,0,0,1,1]], [null,E]], script: [] },
     only: { n: 6, goals: { m: 18, l: 18, k: 18 }, hintDelay: 8, pFit: .95, intro: 'Fruit plate playground',
       pre: [[null,E,'onlyM'], ['l',[0,1,1,0,0,0]], [null,E,'onlyK'], ['m',[0,0,1,1,0,0]], [null,E,'onlyL'], [null,E]], script: [] },
-    all: { n: 6, goals: { m: 18, l: 18, k: 18, x: 1 }, hintDelay: 8, pFit: .95, intro: 'All obstacles', spiders: [[3, 0]],
+    chain: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Chain playground', chains: [[0, 1], [2, 3], [4, 5]],
+      pre: [['m',[1,1,1,1,0,0]], ['l',[0,1,1,0,0,0]], ['m',[0,0,1,1,1,0]], [null,E], ['l',[1,0,0,0,1,1]], ['m',[1,1,0,0,0,0]]], script: [] },
+    all: { n: 6, goals: { m: 18, l: 18, k: 18, x: 1 }, hintDelay: 8, pFit: .95, intro: 'All obstacles', spiders: [[3, 0]], chains: [[3, 4]],
       pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,1,0,0],'ice'], ['k',[1,1,1,0,0,0],'lid'], [null,E], ['m',[0,0,1,1,0,0],'onlyM'], ['k',[0,0,0,0,1,1],'lidOpen']], script: [] },
   };
 
@@ -277,6 +288,7 @@
     if (!st.hideLives && !st.livesIntro) S.livesShown = true;
     Object.assign(S, { spiders: [], stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0,
                        piece: null, pieceIn: 0, phase: 'in', phaseT: 0 });
+    S.chains = (st.chains || []).map(([a, b]) => ({ a, b, snap: -1, tug: 0, appear: 1 }));
     S.spiders = (st.spiders || []).map(([p, slot, wait, to], id) => ({ id, p, slot, wait: wait || 1 + ((Math.random() * 3) | 0), to, from: null, t: 1, land: -9, startle: 0 }));
     if (st.obstIntro && !(S.seen || {})[st.obstIntro]) { S.phase = 'obstacle'; S.introKey = st.obstIntro; SFX.obstacle(); }   // the obstacle intro comes before the board
     fly = null; flyers = []; idle = 0;
@@ -290,6 +302,10 @@
   };
   const filled = p => p.slots.filter(Boolean).length;
   const hasSpider = p => S.spiders.some(s => S.plates[s.p] === p);
+  const chainOf = p => S.chains.find(c => c.snap < 0 && (S.plates[c.a] === p || S.plates[c.b] === p));
+  const mateOf = (c, p) => S.plates[S.plates[c.a] === p ? c.b : c.a];
+  const releasing = p => S.chains.some(c => c.snap >= 0 && (S.plates[c.a] === p || S.plates[c.b] === p));
+  const serving = p => p.pop > 0 || releasing(p);
   const neighbours = p => S.plates.filter(q => q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 200);
   const anyFit = pc => S.plates.some(p => fits(p, pc));
 
@@ -464,6 +480,9 @@
     tap() { hiss({ dur: .025, vol: .04, type: 'bandpass', f0: 2600, q: 4 }); tone({ f0: 300, f1: 200, dur: .05, vol: .03 }); },   // ...and lands
     cheer() { tone({ f0: 520, f1: 780, dur: .1, vol: .04 }); tone({ f0: 660, f1: 990, dur: .1, vol: .04, delay: .14 }); hiss({ dur: .3, vol: .025, type: 'bandpass', f0: 1800, f1: 4200, q: 2, delay: .5 }); },   // yay, then the thread zips up
     spiderGet() { bell(PENTA[7], .05); bell(PENTA[9], .045, .07); tone({ f0: 300, f1: 160, dur: .08, vol: .05 }); },   // into the goal
+    clink() { bell(PENTA[10], .03); tone({ f0: 2600, f1: 2400, dur: .05, vol: .02, type: 'triangle', delay: .03 }); },             // a full chained plate pulls its chain
+    strain() { for (let i = 0; i < 4; i++) tone({ f0: 1900 + i * 120, dur: .03, vol: .02, type: 'triangle', delay: i * .06 }); },   // the chain rattles tight
+    snap() { hiss({ dur: .14, vol: .06, type: 'highpass', f0: 2500 }); for (let i = 0; i < 5; i++) bell(PENTA[6 + (i % 4)], .03, .02 + i * .045); tone({ f0: 160, f1: 80, dur: .12, vol: .08 }); },   // it snaps and the links scatter
     rewind() { hiss({ dur: .26, vol: .05, type: 'bandpass', f0: 2400, f1: 700, q: 1 }); bell(PENTA[7], .05, .02); bell(PENTA[4], .05, .12); },              // back in time
     coin() { bell(PENTA[9], .06); tone({ f0: 2093, dur: .07, vol: .025, delay: .05 }); },
     win() { [0, 2, 4, 5, 7].forEach((n, i) => bell(PENTA[n], .1, i * .1)); bell(PENTA[9], .1, .55); bell(PENTA[7], .08, .55); },
@@ -621,13 +640,13 @@
     const onFruit = free.filter(j => q.slots[j]), pool = onFruit.length ? onFruit : free;
     return pool.length ? pool[(Math.random() * pool.length) | 0] : -1;
   }
-  const spiderCanLand = q => q && !q.pop && !q.adding && !q.ice && !(q.lid && !q.lidOpen);
+  const spiderCanLand = q => q && !serving(q) && !q.adding && !q.ice && !(q.lid && !q.lidOpen);
   // after every move: each spider counts down its own random 1-3 moves, then hops onto a neighbouring plate
   // (it stays put if none can take it), each after its own short delay so they never move together
   function spidersHop(used) {
     for (const s of S.spiders) {
       const home = S.plates[s.p];
-      if (home.pop) continue;                                  // its plate is being served: it is about to be collected
+      if (serving(home)) continue;                                // its plate is being served: it is about to be collected
       if (home === used) s.startle = 1;
       if (--s.wait > 0) continue;
       s.wait = 1 + ((Math.random() * 3) | 0);
@@ -650,6 +669,94 @@
       return false;
     });
     if (n) SFX.cheer();
+  }
+  // ---------- chained plates: a steel chain from rim to rim; a full plate pulls it tight while it waits ----------
+  const CHAIN_SNAP = .32, CHAIN_IN = 44, LINK = 1.3;                                    // strain time before it snaps, anchor distance from a plate's middle
+  // links between two anchor points, sagging when slack; tense 0..1 pulls it straight and shakes it, glow tints it gold..white
+  function chainLinks(ax, ay, bx, by, tense) {
+    const len = Math.hypot(bx - ax, by - ay), n = Math.max(4, Math.round(len / (9.5 * LINK))), sag = 9 * (1 - tense);
+    const mx = (ax + bx) / 2, my = (ay + by) / 2 + sag, out = [];
+    for (let i = 0; i < n; i++) {
+      const u = (i + .5) / n, x = (1 - u) * (1 - u) * ax + 2 * (1 - u) * u * mx + u * u * bx, y = (1 - u) * (1 - u) * ay + 2 * (1 - u) * u * my + u * u * by;
+      const tx = 2 * (1 - u) * (mx - ax) + 2 * u * (bx - mx), ty = 2 * (1 - u) * (my - ay) + 2 * u * (by - my);
+      out.push([x, y, Math.atan2(ty, tx), i % 2]);
+    }
+    return out;
+  }
+  function drawLink(x, y, a, edge, glow = 0, s = 1) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.scale(s, s); ctx.lineCap = 'round';
+    const metal = glow > .5 ? '#FFF6D0' : glow > 0 ? '#F4E3A0' : '#C9D2E0';
+    if (edge) {                                                           // seen side on: a short bar
+      ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineWidth = 5; ctx.strokeStyle = '#3B4252'; ctx.stroke();
+      ctx.lineWidth = 3; ctx.strokeStyle = metal; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-4.5, -.7); ctx.lineTo(4.5, -.7); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke();
+    } else {                                                              // seen face on: a ring
+      ctx.beginPath(); ctx.ellipse(0, 0, 6.6, 4.4, 0, 0, TAU); ctx.lineWidth = 4.6; ctx.strokeStyle = '#3B4252'; ctx.stroke();
+      ctx.lineWidth = 2.6; ctx.strokeStyle = metal; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, 0, 6.6, 4.4, 0, Math.PI * 1.1, Math.PI * 1.75); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawBolt(x, y, s = 1) {                                        // where the chain is fixed to a plate's rim
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.fillStyle = 'rgba(20,30,60,.3)'; ctx.beginPath(); ctx.arc(.8, 1.8, 6.2, 0, TAU); ctx.fill();
+    const g = ctx.createRadialGradient(-2, -2, .5, 0, 0, 6.5); g.addColorStop(0, '#FFFFFF'); g.addColorStop(.45, '#C9D2E0'); g.addColorStop(1, '#6B7488');
+    ctx.beginPath(); ctx.arc(0, 0, 6, 0, TAU); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#3B4252'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, TAU); ctx.fillStyle = '#4A5264'; ctx.fill();
+    ctx.restore();
+  }
+  // one chain from plate centre a to plate centre b (s scales it for the intro)
+  function drawChainBetween(ax, ay, bx, by, tense = 0, glow = 0, alpha = 1, s = 1, waitA = 0, waitB = 0, open = 0) {
+    const d = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / d, uy = (by - ay) / d, r = CHAIN_IN * s;
+    let px = ax + ux * r, py = ay + uy * r, qx = bx - ux * r, qy = by - uy * r;
+    const jit = tense > .3 ? Math.sin(t * 60) * 1.4 * tense : 0;
+    ctx.save(); ctx.globalAlpha *= alpha;
+    for (const [w, x, y] of [[waitA, ax, ay], [waitB, bx, by]]) if (w) {      // a plate that waits glows softly
+      ctx.beginPath(); ctx.arc(x, y, (PLATE_R + 3) * s, 0, TAU); ctx.lineWidth = 5 * s; ctx.strokeStyle = `rgba(255,214,90,${.45 + Math.sin(t * 6) * .25})`; ctx.stroke();
+    }
+    if (glow) { ctx.shadowColor = `rgba(255,236,150,${glow})`; ctx.shadowBlur = 14 * glow; }
+    for (const [x, y, a, edge] of chainLinks(px, py, qx, qy, tense)) drawLink(x - uy * jit, y + ux * jit, a, edge, glow, s * LINK);
+    ctx.shadowBlur = 0;
+    drawBolt(px, py, s * 1.15); drawBolt(qx, qy, s * 1.15);
+    drawPadlock((px + qx) / 2 - uy * jit, (py + qy) / 2 + 9 * (1 - tense) * .5 + ux * jit + 6 * s, s, glow, open);
+    ctx.restore();
+  }
+  // a gold padlock hanging from the middle of the chain; open 0..1 swings its shackle up
+  function drawPadlock(x, y, s = 1, glow = 0, open = 0) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(Math.sin(t * 2.2) * .08 * (1 - glow));
+    ctx.save(); ctx.translate(5, -6); ctx.rotate(-open * 1.1); ctx.translate(-5, 6);                       // shackle
+    ctx.beginPath(); ctx.moveTo(-5, -5); ctx.lineTo(-5, -9); ctx.arc(0, -9, 5, Math.PI, 0); ctx.lineTo(5, -5 - open * 4);
+    ctx.lineCap = 'round'; ctx.lineWidth = 5; ctx.strokeStyle = '#3B4252'; ctx.stroke(); ctx.lineWidth = 2.8; ctx.strokeStyle = '#D5DCE8'; ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(40,20,0,.3)'; ctx.beginPath(); ctx.roundRect(-8, -4, 17.5, 15, 4); ctx.fill();         // body
+    const g = ctx.createLinearGradient(0, -6, 0, 10); g.addColorStop(0, glow > .5 ? '#FFFBE0' : '#FFE68A'); g.addColorStop(.55, '#FFC02E'); g.addColorStop(1, '#E08A0A');
+    ctx.beginPath(); ctx.roundRect(-8.5, -5.5, 17, 14.5, 4); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#8A4E06'; ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(-6.5, -4.2, 13, 3, 1.5); ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 1.6, 2, 0, TAU); ctx.moveTo(-1, 2.5); ctx.lineTo(1, 2.5); ctx.lineTo(.6, 6); ctx.lineTo(-.6, 6); ctx.closePath(); ctx.fillStyle = '#6A3A04'; ctx.fill();   // keyhole
+    ctx.restore();
+  }
+  function drawChains() {
+    for (const c of S.chains) {
+      const A = S.plates[c.a], B = S.plates[c.b]; if (!A || !B) continue;
+      const [ax, ay] = plateOffset(A), [bx, by] = plateOffset(B);
+      const alpha = c.appear * Math.min(clamp01(A.enter), clamp01(B.enter)) * (1 - Math.max(clamp01(A.exit), clamp01(B.exit)));
+      const fa = filled(A) === 6, fb = filled(B) === 6, snapping = c.snap >= 0, u = snapping ? c.snap / CHAIN_SNAP : 0;
+      drawChainBetween(A.x + ax, A.y + ay, B.x + bx, B.y + by, snapping ? 1 : (fa || fb ? .85 : 0) + c.tug * .15, snapping ? .4 + u * .6 : 0, alpha, 1,
+        !snapping && fa && !fb, !snapping && fb && !fa, snapping ? easeIn(u) : 0);
+    }
+  }
+  // the chain snaps: its links fly off and both plates are served (unless the hammer broke it)
+  function breakChain(c, serve = true) {
+    const A = S.plates[c.a], B = S.plates[c.b], d = Math.hypot(B.x - A.x, B.y - A.y) || 1, ux = (B.x - A.x) / d, uy = (B.y - A.y) / d;
+    for (const [x, y, a, edge] of chainLinks(A.x + ux * CHAIN_IN, A.y + uy * CHAIN_IN, B.x - ux * CHAIN_IN, B.y - uy * CHAIN_IN, 1)) {
+      const v = 140 + Math.random() * 160, b = Math.atan2(y - (A.y + B.y) / 2, x - (A.x + B.x) / 2) + (Math.random() - .5) * 1.2;
+      particles.push({ kind: 'link', x, y, vx: Math.cos(b) * v, vy: Math.sin(b) * v - 160, rot: a, vr: (Math.random() - .5) * 14, edge, life: .8, age: 0 });
+    }
+    particles.push({ kind: 'lock', x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 + 6, vx: (Math.random() - .5) * 120, vy: -320, rot: 0, vr: (Math.random() - .5) * 10, life: .9, age: 0 });
+    for (let j = 0; j < 8; j++) { const a = Math.random() * TAU, v = 80 + Math.random() * 120;
+      sparks.push({ x: (A.x + B.x) / 2, y: (A.y + B.y) / 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 6, age: 0, life: .45, rot: a, color: j % 2 ? '#FFF4C2' : '#E3EAF5' }); }
+    c.broken = true; SFX.snap();
+    if (serve) for (const q of [A, B]) if (filled(q) === 6 && !q.pop) q.pop = .001;
   }
   // ---------- shutter: a roller door that slides over the plate, inside its rim ----------
   // Closing it drops like a garage door and slams with a little bounce; opening it tugs down, then rolls up fast.
@@ -820,6 +927,18 @@
         ctx.save(); ctx.globalAlpha = .26 * (1 - lift / 60); ctx.fillStyle = '#2A1A40'; ctx.beginPath(); ctx.ellipse(x, y + 8, 10, 3, 0, 0, TAU); ctx.fill(); ctx.restore();
         ctx.save(); ctx.translate(x, y - lift); ctx.rotate(k * TAU * (i ? -1 : 1));
         drawSpiderAt(0, 0, .5, { tuck: Math.sin(k * Math.PI), blink: blinkAt(3), look: [i ? -1 : 1, .2], scared: u > .18 && u < 1 }); ctx.restore(); } },
+    chain: { title: 'Chained Plates', word: 'CHAINED', lines: ['CHAINED plates are only', 'served together!'],
+      demo() {                                                // left plate is full and waits; the right one fills; the chain strains and snaps
+        const c = t % 3.2, PS = .6, P = [-64, 64], right = c < 1.1 ? [1, 1, 1, 1, 0, 0] : [1, 1, 1, 1, 1, 1], gone = c > 1.5 && c < 2.4;
+        const pop = c > 1.5 && c < 1.7 ? Math.sin((c - 1.5) / .2 * Math.PI) * .12 : 0;
+        P.forEach((px, i) => { ctx.save(); ctx.translate(px, 0); ctx.scale(PS * (1 + pop), PS * (1 + pop)); ctx.drawImage(A.plate, -MC[0], -MC[1]);
+          if (!gone) (i ? right : [1, 1, 1, 1, 1, 1]).forEach((on, j) => { if (on) drawSlice(0, 0, i ? 'l' : 'm', j); }); ctx.restore(); });
+        if (c < 1.5) { const u = c > 1.1 ? (c - 1.1) / .4 : 0; drawChainBetween(-64, 0, 64, 0, c > 1.1 ? 1 : .85, c > 1.1 ? .4 + u * .6 : 0, 1, PS, c <= 1.1, 0, c > 1.1 ? easeIn(u) : 0); }
+        else if (c < 2.1) { const u = (c - 1.5) / .6;                         // links flying off
+          chainLinks(-64 + CHAIN_IN * PS, 0, 64 - CHAIN_IN * PS, 0, 1).forEach(([x, y, a, edge], i) => { const b = (i - 2) * .5 - Math.PI / 2;
+            ctx.save(); ctx.globalAlpha = 1 - u; drawLink(x + Math.cos(b) * 70 * u, y + Math.sin(b) * 70 * u + 120 * u * u, a + u * 8 * (i % 2 ? 1 : -1), edge, 0, PS * LINK); ctx.restore(); });
+          ctx.save(); ctx.globalAlpha = 1 - u; ctx.translate(0, 4 - 90 * u + 160 * u * u); ctx.rotate(u * 5); drawPadlock(0, 0, PS * 1.1, 0, 1); ctx.restore(); }
+        else if (c > 2.4) drawChainBetween(-64, 0, 64, 0, .85, 0, clamp01((c - 2.4) * 3), PS, 1, 0); } },
     only: { title: 'Fruit Plate', word: 'FRUIT PLATE', lines: ['A FRUIT PLATE only takes', 'the fruit printed on it!'],
       demo() { ctx.drawImage(A.plate, -MC[0], -MC[1]); drawOnly('l'); [1, 1, 0, 0, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'l', j); }); } },
   };
@@ -1167,7 +1286,7 @@
   let unfly = null;
   const snapPlate = q => ({ fruit: q.fruit, slots: q.slots.slice(), ice: q.ice, spin: q.spin, turns: q.turns, lid: q.lid, lidOpen: q.lidOpen });
   function remember(p) {
-    (S.hist = S.hist || []).push({ plates: S.plates.map(snapPlate), spiders: S.spiders.map(s => ({ id: s.id, p: s.p, slot: s.slot, wait: s.wait, to: s.to })), left: { ...S.left }, combo: S.combo, moves: S.moves, lives: S.lives, served: S.served, piece: S.piece, pi: S.plates.indexOf(p) });
+    (S.hist = S.hist || []).push({ plates: S.plates.map(snapPlate), chains: S.chains.map(c => ({ a: c.a, b: c.b })), spiders: S.spiders.map(s => ({ id: s.id, p: s.p, slot: s.slot, wait: s.wait, to: s.to })), left: { ...S.left }, combo: S.combo, moves: S.moves, lives: S.lives, served: S.served, piece: S.piece, pi: S.plates.indexOf(p) });
     if (S.hist.length > 20) S.hist.shift();
   }
   function rewind() {
@@ -1178,6 +1297,7 @@
       if (q.lid && o.lidOpen !== q.lidOpen) q.shT = 0;
       if (filled(q) !== o.slots.filter(Boolean).length) q.bounce = 1;
       Object.assign(q, { ...o, slots: o.slots.slice() }); });
+    S.chains = h.chains.map(o => S.chains.find(c => c.a === o.a && c.b === o.b) || { ...o, snap: -1, tug: 0, appear: 0 });   // a snapped chain comes back
     S.spiders = h.spiders.map(o => {                          // spiders hop back, collected ones drop back in
       const s = S.spiders.find(q => q.id === o.id);
       if (!s) return { ...o, from: null, t: 0, land: -9, startle: 0 };
@@ -1200,7 +1320,7 @@
     if (armed === b.key) { armed = null; SFX.toggle(); return; }       // tap again to put the hammer down
     if (!(boostLeft[b.key] > 0)) { SFX.lock(); return showToast('Get more in the shop (full game)'); }
     if (b.key === 'rewind') {
-      const busy = fly || unfly || flyers.length || S.plates.some(q => q.pop || q.adding) || S.spiders.some(s => s.t < 1);
+      const busy = fly || unfly || flyers.length || S.plates.some(q => serving(q) || q.adding) || S.spiders.some(s => s.t < 1);
       if (busy) return;                                        // wait until the last move has settled
       if (!S.hist || !S.hist.length) { SFX.nope(); return showToast('Nothing to rewind yet'); }
       rewind(); boostLeft.rewind--; refreshSpin = 1; armed = null;
@@ -1225,6 +1345,8 @@
     return best;
   }
   function hammerHit(p) {
+    const ch = chainOf(p);
+    if (ch) { const mate = mateOf(ch, p); breakChain(ch, false); S.chains = S.chains.filter(c => c !== ch); if (filled(mate) === 6 && !mate.pop) { mate.pop = .001; S.combo = Math.max(1, S.combo); } }   // smashing a chained plate breaks its chain
     if (p.lid) {
       const k = shutterK(p.lidOpen, p.shT), top = p.y + FRUIT_C[1] - SH.R, h = 2 * SH.R * k;
       for (let y = top + 6; y < top + Math.max(h, 14); y += SH.slat) { const a = (Math.random() - .5) * 1.2;
@@ -1438,8 +1560,8 @@
     const btn = (act, label, cls = '') => `<button type="button" class="${cls}" data-act="${act}">${label}</button>`;
     testBody.innerHTML =
       sec('Play a level', `<div class="tgrid">${STAGE_NAMES.map((n, i) => btn('lvl:' + i, `${i + 1} · ${n}`)).join('')}</div>`) +
-      sec('Playgrounds', `<div class="tgrid">${btn('pg:ice', 'Ice', 'b')}${btn('pg:spin', 'Spinning plate', 'b')}${btn('pg:lid', 'Shutter', 'b')}${btn('pg:spider', 'Spider', 'b')}${btn('pg:only', 'Fruit plate', 'b')}${btn('pg:all', 'All obstacles', 'b')}</div>`) +
-      sec('Obstacle intros', `<div class="tgrid">${btn('intro:ice', 'Ice', 'o')}${btn('intro:spin', 'Spinning plate', 'o')}${btn('intro:lid', 'Shutter', 'o')}${btn('intro:spider', 'Spider', 'o')}${btn('intro:only', 'Fruit plate', 'o')}</div>`) +
+      sec('Playgrounds', `<div class="tgrid">${btn('pg:ice', 'Ice', 'b')}${btn('pg:spin', 'Spinning plate', 'b')}${btn('pg:lid', 'Shutter', 'b')}${btn('pg:spider', 'Spider', 'b')}${btn('pg:only', 'Fruit plate', 'b')}${btn('pg:chain', 'Chained plates', 'b')}${btn('pg:all', 'All obstacles', 'b')}</div>`) +
+      sec('Obstacle intros', `<div class="tgrid">${btn('intro:ice', 'Ice', 'o')}${btn('intro:spin', 'Spinning plate', 'o')}${btn('intro:lid', 'Shutter', 'o')}${btn('intro:spider', 'Spider', 'o')}${btn('intro:only', 'Fruit plate', 'o')}${btn('intro:chain', 'Chained plates', 'o')}</div>`) +
       sec('Screens', `<div class="tgrid">${btn('win', 'Win screen', 'o')}${btn('fail', 'Fail screen', 'o')}${btn('bus', 'Bus change', 'o')}${btn('menu', 'Main menu', 'b')}</div>`) +
       sec('Level on the Play button', `<div class="trow">${btn('lv-', '−', 'b')}<b id="testLv">${progress}</b>${btn('lv+', '+', 'b')}${btn('reset', 'Reset to 1', 'r')}</div>`) +
       sec('Options', `<label><input type="checkbox" id="testAutoBus"${TEST.autoBus ? ' checked' : ''}> Bus drives by itself on the menu</label>
@@ -1548,7 +1670,12 @@
     p.fruit = f.piece.fruit;
     p.bounce = 1; S.moves++;
     SFX.place();
-    if (filled(p) === 6) { p.pop = .001; S.combo++; } else S.combo = 0;
+    if (filled(p) === 6) {
+      const c = chainOf(p);
+      if (!c) { p.pop = .001; S.combo++; }
+      else if (filled(mateOf(c, p)) === 6) { c.snap = 0; S.combo++; SFX.strain(); }      // both full: the chain strains, then snaps
+      else { c.tug = 1; S.combo = 0; SFX.clink(); }                                       // full, but waits for its partner
+    } else S.combo = 0;
     afterMove(p);
     setTimeout(spawnPiece, 120);
   }
@@ -1561,7 +1688,7 @@
   function afterMove(used) {
     let spun = false, lids = 0;
     for (const q of S.plates) {
-      if (q.spin && !q.pop) { q.slots = q.slots.map((_, i) => q.slots[(i + 5) % 6]); q.turns++; q.spinA = 1; q.spinDir = 1; spun = true;
+      if (q.spin && !serving(q)) { q.slots = q.slots.map((_, i) => q.slots[(i + 5) % 6]); q.turns++; q.spinA = 1; q.spinDir = 1; spun = true;
         const qi = S.plates.indexOf(q); for (const s of S.spiders) { if (s.p === qi) s.slot = (s.slot + 1) % 6; if (s.from && s.from[0] === qi) s.from[1] = (s.from[1] + 1) % 6; } }
       if (q.lid) { q.lidOpen = !q.lidOpen; q.shT = 0; if (q.lidOpen) lids++; }
     }
@@ -1571,8 +1698,8 @@
   }
   function spawnPiece() {
     if (scene !== 'game' || S.phase !== 'play' || S.piece || fly || unfly) return;
-    const pending = f => f === 'x' ? flyers.filter(q => q.kind === 'spider').length + S.spiders.filter(s => S.plates[s.p].pop).length
-      : flyers.filter(q => q.kind === 'slice' && q.fruit === f).length + S.plates.filter(q => q.pop && q.fruit === f).reduce((a, q) => a + q.slots.filter(Boolean).length, 0);
+    const pending = f => f === 'x' ? flyers.filter(q => q.kind === 'spider').length + S.spiders.filter(s => serving(S.plates[s.p])).length
+      : flyers.filter(q => q.kind === 'slice' && q.fruit === f).length + S.plates.filter(q => serving(q) && q.fruit === f).reduce((a, q) => a + q.slots.filter(Boolean).length, 0);
     if (goalsOf(cfg()).every(f => S.left[f] - pending(f) <= 0)) return;   // stage is finishing
     S.piece = newPiece(); S.pieceIn = 0; idle = 0; SFX.appear();
     if (!anyFit(S.piece)) endStage('moves');
@@ -1605,6 +1732,11 @@
     if (fly && (fly.t += dt / .16) >= 1) { const f = fly; fly = null; land(f); }
     if (unfly && !unfly.lifted && (unfly.lifted = true)) { unfly.p.slots = unfly.slots; unfly.p.fruit = unfly.fruit; }
     if (unfly && (unfly.t += dt / .24) >= 1) { S.piece = unfly.piece; S.pieceIn = .7; unfly = null; SFX.appear(); }
+    for (const c of S.chains) {
+      c.tug = Math.max(0, c.tug - dt * 2.5); c.appear = Math.min(1, c.appear + dt * 3);
+      if (c.snap >= 0 && (c.snap += dt) >= CHAIN_SNAP) breakChain(c);
+    }
+    S.chains = S.chains.filter(c => !c.broken);
     for (const s of S.spiders) {
       const u0 = s.t; s.t = Math.min(1, s.t + dt / HOP); s.startle = Math.max(0, s.startle - dt * 4);
       if (u0 < 0 && s.t >= 0 && s.from) SFX.hop();
@@ -1674,7 +1806,7 @@
       const k = S.autoEnd; S.autoEnd = null; S.piece = null;
       if (k === 'win') { S.phase = 'clear'; S.phaseT = 0; S.forceWin = true; } else endStage('moves');
     } else if (S.phase === 'play') {
-      if (goalsOf(st).every(f => S.left[f] === 0) && !flyers.length && !fly && !S.plates.some(p => p.pop) && !note) {
+      if (goalsOf(st).every(f => S.left[f] === 0) && !flyers.length && !fly && !S.plates.some(serving) && !note) {
         S.phase = 'clear'; S.phaseT = 0; S.piece = null; if (!endsHere()) SFX.banner();
       }
     } else if (S.phase === 'clear') {
@@ -2033,6 +2165,7 @@
     drawLocks();
     if (S.phase !== 'obstacle') ctx.drawImage(A.gen, GEN.x - MC[0], GEN.y - MC[1]);   // hidden until the board comes in
     S.plates.forEach(drawPlate);
+    drawChains();
     drawSpiders();
     drawHammerFx();
 
@@ -2051,6 +2184,8 @@
         ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.scale(q.s, q.s);
         ctx.drawImage(A[q.sheet], sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh); ctx.restore();
       } else if (q.kind === 'wedge') { drawSlice(q.x, q.y, q.fruit, q.i, 1 - k * .4); }
+      else if (q.kind === 'link') { ctx.globalAlpha = 1 - k * k; drawLink(q.x, q.y, q.rot, q.edge, 0, LINK); }
+      else if (q.kind === 'lock') { ctx.globalAlpha = 1 - k * k; ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); drawPadlock(0, 0, 1.1, 0, 1); ctx.restore(); }
       else if (q.kind === 'dust') { ctx.globalAlpha = .55 * (1 - k); ctx.fillStyle = '#F4EEE6'; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (1 + k * 1.4), 0, TAU); ctx.fill(); ctx.globalAlpha = 1; }
       else if (q.kind === 'slat') { ctx.save(); ctx.globalAlpha = 1 - k * k; ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillStyle = '#6DB3F7'; ctx.fillRect(-q.w / 2, -5, q.w, 10);
         ctx.fillStyle = '#2E6FCF'; ctx.fillRect(-q.w / 2, 3.5, q.w, 1.6); ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(-q.w / 2, -4, q.w, 1.3); ctx.restore(); }
@@ -2226,7 +2361,7 @@
   function openDrive() { if (TEST.autoBus && scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.busGo(); } }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(openDrive, 600); });
   addEventListener('pageshow', e => { if (e.persisted) setTimeout(openDrive, 600); });
-  function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { spiders: [], stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
+  function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { spiders: [], chains: [], stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
   window.claude?.hot?.snapshot?.(() => ({ S, scene }));
 
   resize();
