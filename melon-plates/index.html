@@ -175,8 +175,17 @@
     { n: 6, goals: { m: 18, l: 12, k: 12 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true,
       pre: [['m',[1,1,1,0,0,0],'lid'], ['l',[0,1,1,0,0,0]], ['k',[0,0,1,1,0,0],'spin'], [null,E], ['m',[0,0,0,1,1,1],'lidOpen'], ['k',[1,1,0,0,0,0]]],
       script: [] },
+    // mold: takes a slot and spreads one slot to a neighbouring plate when its counter runs out ('mold', mold slots, counter)
+    { n: 4, goals: { m: 12, l: 6 }, hintDelay: 1.5, pFit: 1, obstIntro: 'mold', intro: '',
+      pre: [['m',[1,1,1,0,0,0],'mold',[0,0,0,1,0,0],1], ['l',[1,1,1,1,0,0]], [null,E], ['m',[1,1,0,0,0,0]]],
+      script: [{ fruit:'l', start:4, size:2, hint:1, tip: 'Mold spreads when its\ncounter runs out!' },
+               { fruit:'m', start:4, size:2, hint:0, tip: 'Fill the moldy plate\nto clean it!' },
+               { fruit:'m', start:1, size:3, hint:2 }] },
+    { n: 6, goals: { m: 18, l: 12, k: 12 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true,
+      pre: [['m',[1,1,0,0,0,0],'mold',[0,0,1,0,0,0],3], ['l',[0,0,0,1,1,0]], [null,E], ['k',[1,1,0,0,0,0],'mold',[0,0,0,0,0,1],2], ['m',[0,0,1,1,0,0]], ['k',[0,0,1,1,0,0],'spin']],
+      script: [] },
   ];
-  const STAGE_NAMES = ['Tutorial', 'Lemon', 'Ice intro', 'Ice level', 'Kiwi', 'Three fruits', 'Spin intro', 'Spin level', 'Shutter intro', 'Shutter level'];
+  const STAGE_NAMES = ['Tutorial', 'Lemon', 'Ice intro', 'Ice level', 'Kiwi', 'Three fruits', 'Spin intro', 'Spin level', 'Shutter intro', 'Shutter level', 'Mold intro', 'Mold level'];
   // test playgrounds (test menu only): never change the saved level
   const PLAYGROUNDS = {
     ice: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Ice playground',
@@ -185,8 +194,10 @@
       pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,0,0,0]], [null,E,'spin'], ['m',[0,0,1,1,1,0]], ['l',[1,0,0,0,1,1],'spin'], [null,E]], script: [] },
     lid: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Shutter playground',
       pre: [['m',[1,1,1,0,0,0],'lid'], ['l',[0,1,1,0,0,0]], [null,E,'lidOpen'], ['m',[0,0,1,1,0,0]], ['l',[1,1,0,0,0,1],'lid'], [null,E]], script: [] },
+    mold: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Mold playground',
+      pre: [['m',[1,1,0,0,0,0],'mold',[0,0,1,0,0,0],3], ['l',[0,1,1,0,0,0]], [null,E], ['m',[0,0,1,1,0,0],'mold',[0,0,0,0,1,0],1], ['l',[1,0,0,0,0,1]], [null,E]], script: [] },
     all: { n: 6, goals: { m: 18, l: 18, k: 18 }, hintDelay: 8, pFit: .95, intro: 'All obstacles',
-      pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,1,0,0],'ice'], ['k',[1,1,1,0,0,0],'lid'], [null,E], ['m',[0,0,1,1,0,0]], ['k',[0,0,0,0,1,1],'lidOpen']], script: [] },
+      pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,1,0,0],'ice'], ['k',[1,1,1,0,0,0],'lid'], [null,E], ['m',[0,0,1,1,0,0],'mold',[1,0,0,0,0,0],3], ['k',[0,0,0,0,1,1],'lidOpen']], script: [] },
   };
 
   const load = src => { const i = new Image(); i.src = src; return i; };
@@ -232,12 +243,12 @@
     const centres = st.board ? st.board.plates : LAYOUT[st.n].map(pi => POS[pi]);
     [GEN.x, GEN.y] = st.board ? st.board.gen : LEVEL_GEN;
     return centres.map(([cx, cy], i) => {
-      const [fruit, slots, obstacle] = st.pre[i];
+      const [fruit, slots, obstacle, moldSlots, moldT] = st.pre[i];
       const dx = cx - GEN.x, dy = cy - GEN.y, len = Math.hypot(dx, dy) || 1;
       return { fruit, slots: slots.map(Boolean), x: cx, y: cy, ux: dx / len, uy: dy / len,
                bounce: 0, pop: 0, shake: 0, enter: 0, exit: 0, delay: i * .07, ice: obstacle === 'ice', iceBreak: 0,
                spin: obstacle === 'spin', spinA: 0, turns: 0, lid: obstacle === 'lid' || obstacle === 'lidOpen', lidOpen: obstacle === 'lidOpen',
-               shT: 9, rattle: 0 };
+               shT: 9, rattle: 0, mold: (obstacle === 'mold' ? moldSlots : E).map(Boolean), moldT: moldT || MOLD_EVERY, moldGrow: [1, 1, 1, 1, 1, 1], moldBump: 0 };
     });
   }
   // the lives / combo / wrong-plate explanations show once on this device, ever
@@ -258,10 +269,12 @@
 
   const fits = (p, pc) => {
     if (p.pop || p.ice || (p.lid && !p.lidOpen) || (p.fruit && p.fruit !== pc.fruit)) return false;
-    for (let k = 0; k < pc.size; k++) if (p.slots[(pc.start + k) % 6]) return false;
+    for (let k = 0; k < pc.size; k++) if (p.slots[(pc.start + k) % 6] || p.mold[(pc.start + k) % 6]) return false;
     return true;
   };
-  const filled = p => p.slots.filter(Boolean).length;
+  const filled = p => p.slots.filter(Boolean).length + p.mold.filter(Boolean).length;      // mold takes room too
+  const moldy = p => p.mold.some(Boolean);
+  const MOLD_EVERY = 3;                                       // moves between spreads
   const neighbours = p => S.plates.filter(q => q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 200);
   const anyFit = pc => S.plates.some(p => fits(p, pc));
 
@@ -432,6 +445,8 @@
     rollUp() { for (let i = 0; i < 6; i++) tone({ f0: 520 + i * 70, dur: .025, vol: .028, type: 'triangle', delay: .09 + i * .035 }); hiss({ dur: .24, vol: .03, type: 'bandpass', f0: 900, f1: 2200, q: 1.5, delay: .08 }); },   // shutter rattles up
     slam() { tone({ f0: 150, f1: 70, dur: .16, vol: .2 }); hiss({ dur: .1, vol: .06, type: 'lowpass', f0: 1400 }); tone({ f0: 640, f1: 600, dur: .08, vol: .025, type: 'triangle', delay: .02 }); },   // door hits the rim
     rattle() { for (let i = 0; i < 4; i++) tone({ f0: 420 + (i % 2) * 60, dur: .025, vol: .03, type: 'triangle', delay: i * .045 }); },                     // tapping a closed shutter
+    moldSpread() { hiss({ dur: .2, vol: .06, type: 'bandpass', f0: 1100, f1: 420, q: 1.2 }); tone({ f0: 300, f1: 190, dur: .09, vol: .07, delay: .4 }); hiss({ dur: .08, vol: .03, type: 'lowpass', f0: 700, delay: .4 }); },   // spores puff out, land with a soft blop
+    moldClean() { hiss({ dur: .22, vol: .045, type: 'bandpass', f0: 900, f1: 3200, q: 1.4 }); bell(PENTA[6], .045, .06); bell(PENTA[9], .035, .13); },   // the mold whooshes away
     rewind() { hiss({ dur: .26, vol: .05, type: 'bandpass', f0: 2400, f1: 700, q: 1 }); bell(PENTA[7], .05, .02); bell(PENTA[4], .05, .12); },              // back in time
     coin() { bell(PENTA[9], .06); tone({ f0: 2093, dur: .07, vol: .025, delay: .05 }); },
     win() { [0, 2, 4, 5, 7].forEach((n, i) => bell(PENTA[n], .1, i * .1)); bell(PENTA[9], .1, .55); bell(PENTA[7], .08, .55); },
@@ -475,11 +490,13 @@
     if (p.shake) { ctx.beginPath(); ctx.arc(0, 0, PLATE_R - 1, 0, TAU); ctx.strokeStyle = `rgba(255,77,77,${p.shake})`; ctx.lineWidth = 5; ctx.stroke(); }
     if (turn) { ctx.save(); ctx.translate(FRUIT_C[0], FRUIT_C[1]); ctx.rotate(turn); ctx.translate(-FRUIT_C[0], -FRUIT_C[1]); }
     p.slots.forEach((on, j) => { if (on) drawSlice(0, 0, p.fruit, j); });
+    if (moldy(p)) drawMold(p);
     if (turn) ctx.restore();
     if (p.spin) drawSpinBadge(p.turns * SEG + turn);
     if (p.ice) drawIce(p.slots, 1 - (p.iceIn || 0));
     else if (p.iceBreak > 0) drawIce(p.slots, p.iceBreak, 1 + (1 - p.iceBreak) * .25);
     if (p.lid) drawShutter(shutterK(p.lidOpen, p.shT), p.rattle);
+    if (p.mold.some((on, j) => on && p.moldGrow[j] > 0)) drawMoldBadge(p.moldT, p.moldBump);     // once the spores have landed
     ctx.restore();
   }
   // ---------- spinning plate: a golden turntable under the plate and a turn badge on its rim ----------
@@ -509,6 +526,77 @@
     const g = ctx.createLinearGradient(0, -15, 0, 15); g.addColorStop(0, '#3FA0FF'); g.addColorStop(1, '#1E5FD8');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 15, 0, TAU); ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
     ctx.rotate(a); ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; spinIcon(7, 2.6);
+    ctx.restore();
+  }
+  // ---------- mold: a fuzzy green patch over a slot; mold in neighbouring slots joins into one patch ----------
+  const rnd = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+  function drawMold(p) {
+    const [cx, cy] = FRUIT_C, R = 53, live = [0, 1, 2, 3, 4, 5].filter(j => p.mold[j] && p.moldGrow[j] > 0);
+    if (!live.length) return;
+    const warn = p.moldT === 1 ? Math.sin(t * 7) * .03 : 0;                  // about to spread: it swells a little
+    const at = (j, f, r) => { const a = -Math.PI / 2 + (j + f) * SEG; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; };   // f: 0..1 across slot j
+    // slot j: a wedge with a bumpy outer edge, growing from the middle of its slot
+    const shape = j => {
+      const g = back(clamp01(p.moldGrow[j])) * (1 + warn), a0 = -Math.PI / 2 + j * SEG - .02, a1 = a0 + SEG + .04, [mx, my] = at(j, .5, 30);
+      ctx.save(); ctx.translate(mx, my); ctx.scale(g, g); ctx.translate(-mx, -my);
+      ctx.beginPath(); ctx.moveTo(...at(j, .5, 3)); ctx.arc(cx, cy, R - 3, a0, a1); ctx.closePath();
+      for (let i = 0; i < 4; i++) {
+        const [x, y] = at(j, .06 + .88 * (i + .5) / 4, R - 4 + (i % 2) * 1.5), br = 7.2 + (i % 2) * 1.2 + Math.sin(t * 2.2 + i + j * 2) * .5;
+        ctx.moveTo(x + br, y); ctx.arc(x, y, br, 0, TAU);
+      }
+      for (const [f, r, br] of [[.1, 17, 4.6], [.08, 32, 5.6], [.9, 23, 5], [.92, 37, 5.4]]) {
+        const [x, y] = at(j, f, r); ctx.moveTo(x + br, y); ctx.arc(x, y, br, 0, TAU);
+      }
+      ctx.restore();
+    };
+    ctx.save(); ctx.lineJoin = 'round';
+    // drop shadow, dark outline, then the body
+    ctx.save(); ctx.translate(0, 2.5); ctx.fillStyle = 'rgba(20,50,30,.28)'; live.forEach(j => { shape(j); ctx.fill(); }); ctx.restore();
+    ctx.fillStyle = ctx.strokeStyle = '#3D6A4C'; ctx.lineWidth = 5; live.forEach(j => { shape(j); ctx.fill(); ctx.stroke(); });
+    const body = ctx.createRadialGradient(cx - 10, cy - 12, 4, cx, cy, R + 8);
+    body.addColorStop(0, '#6C9E78'); body.addColorStop(.55, '#8ABD8C'); body.addColorStop(1, '#ADD9A8');
+    ctx.fillStyle = body; live.forEach(j => { shape(j); ctx.fill(); });
+    // inside the patch: puffy lumps, soft blotches, pale fuzz, tiny spores
+    live.forEach(j => {
+      ctx.save(); shape(j); ctx.clip(); ctx.globalAlpha = clamp01(p.moldGrow[j]);
+      for (let i = 0; i < 2; i++) {
+        const [x, y] = at(j, .3 + rnd(j, i) * .4, 17 + i * 14), r = 7 + rnd(i, j) * 2.5;
+        const lg = ctx.createRadialGradient(x - r * .35, y - r * .4, 1, x, y, r);
+        lg.addColorStop(0, 'rgba(216,242,206,.9)'); lg.addColorStop(1, 'rgba(150,200,150,.2)');
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = lg; ctx.fill();
+      }
+      for (let i = 0; i < 3; i++) { const a = -Math.PI / 2 + (j + .2 + rnd(j + 3, i) * .6) * SEG, r = 12 + rnd(i + 7, j) * 30;
+        ctx.beginPath(); ctx.ellipse(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 4 + rnd(j, i + 9) * 3, 3 + rnd(i, j + 5) * 2, a, 0, TAU); ctx.fillStyle = 'rgba(52,100,70,.35)'; ctx.fill(); }
+      for (let i = 0; i < 8; i++) { const [x, y] = at(j, .1 + rnd(j + 11, i) * .8, 9 + rnd(i + 13, j) * 40), tw = .55 + Math.sin(t * 2 + i * 1.7 + j) * .25;
+        ctx.beginPath(); ctx.arc(x, y, 1.4 + rnd(j, i + 21) * 1.6, 0, TAU); ctx.fillStyle = `rgba(238,252,236,${tw})`; ctx.fill(); }
+      for (let i = 0; i < 5; i++) { const [x, y] = at(j, .1 + rnd(j + 17, i) * .8, 10 + rnd(i + 19, j) * 36);
+        ctx.beginPath(); ctx.arc(x, y, 1.1, 0, TAU); ctx.fillStyle = '#467A55'; ctx.fill(); }
+      const [hx, hy] = at(j, .3, R - 5);                                       // shine on an outer lump
+      ctx.beginPath(); ctx.ellipse(hx, hy - 2, 4.5, 2.2, -.4, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fill();
+      ctx.restore();
+    });
+    // a little cluster of spore balls on each slot, bobbing
+    live.forEach(j => {
+      const g = back(clamp01(p.moldGrow[j])), [bx, by] = at(j, .58, 33);
+      for (const [i, dx, dy, rr] of [[0, -4, 1.5, 3.6], [1, 3.5, 2.5, 3], [2, 0, -4, 2.6]]) {
+        const x = bx + dx * g, y = by + dy * g + Math.sin(t * 2.6 + i * 2 + j) * .9, r = rr * g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = '#D6F0D0'; ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = '#3D6A4C'; ctx.stroke();
+        ctx.beginPath(); ctx.arc(x - r * .35, y - r * .35, r * .32, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+      }
+    });
+    ctx.restore();
+  }
+  // moves left before the mold spreads; orange and pulsing on its last move
+  function drawMoldBadge(n, bump = 0) {
+    const last = n === 1, s = 1 + bump * .3 + (last ? Math.sin(t * 7) * .07 : 0);
+    ctx.save(); ctx.translate(-48, -50); ctx.scale(s, s);
+    ctx.fillStyle = 'rgba(30,60,10,.3)'; ctx.beginPath(); ctx.arc(1, 3, 15, 0, TAU); ctx.fill();
+    const g = ctx.createLinearGradient(0, -15, 0, 15);
+    if (last) { g.addColorStop(0, '#FFA24A'); g.addColorStop(1, '#F2602A'); } else { g.addColorStop(0, '#5BA670'); g.addColorStop(1, '#2C6A40'); }
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 15, 0, TAU); ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.font = '900 18px "Goldplay", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = last ? '#B8401A' : '#1B4A2A'; ctx.fillText(n, 0, 2.5);
+    ctx.fillStyle = '#fff'; ctx.fillText(n, 0, 1);
     ctx.restore();
   }
   // ---------- shutter: a roller door that slides over the plate, inside its rim ----------
@@ -669,6 +757,15 @@
     lid: { title: 'Shutter', word: 'SHUTTER', lines: ['The SHUTTER opens and', 'closes after every move!'],
       demo() { const c = t % 2.8, open = c >= 1.4, k = shutterK(open, open ? c - 1.4 : c);
         ctx.drawImage(A.plate, -MC[0], -MC[1]); [1, 1, 1, 1, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawShutter(k); } },
+    mold: { title: 'Mold', word: 'MOLD', lines: ['Serve its plate before', 'the MOLD spreads!'],
+      demo() { const c = t % 3.6, n = Math.max(1, 3 - Math.floor(c / .8)), grow = clamp01((c - 2.4) / .5);
+        const d = { mold: [0, 0, 1, grow > 0, 0, 0], moldGrow: [1, 1, 1, grow, 1, 1], moldT: c < 2.4 ? n : 3 };
+        ctx.drawImage(A.plate, -MC[0], -MC[1]); [1, 1, 0, 0, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); });
+        drawMold(d); drawMoldBadge(d.moldT, c >= 2.4 ? clamp01(1 - (c - 2.4) * 4) : clamp01(1 - (c % .8) * 4));
+        if (c > 2.2 && c < 2.9) { const u = (c - 2.2) / .7;                         // a puff of spores
+          for (let i = 0; i < 6; i++) { const a = -Math.PI * .1 + i * .55, r = 30 + u * 30;
+            ctx.globalAlpha = 1 - u; ctx.beginPath(); ctx.arc(FRUIT_C[0] + Math.cos(a) * r, FRUIT_C[1] + Math.sin(a) * r, 4 + u * 3, 0, TAU); ctx.fillStyle = '#9CCB98'; ctx.fill(); }
+          ctx.globalAlpha = 1; } } },
   };
   // drop-in: falls from above with a little bounce and fades in
   const dropIn = (k, start) => { const u = clamp01((k - start) / .45); return { u, dy: -(1 - back(u)) * 70, a: clamp01(u * 2.5) }; };
@@ -1011,7 +1108,7 @@
   }
   // ---------- rewind: every placed piece leaves a snapshot; rewinding puts the board back and the piece flies home ----------
   let unfly = null;
-  const snapPlate = q => ({ fruit: q.fruit, slots: q.slots.slice(), ice: q.ice, spin: q.spin, turns: q.turns, lid: q.lid, lidOpen: q.lidOpen });
+  const snapPlate = q => ({ fruit: q.fruit, slots: q.slots.slice(), ice: q.ice, spin: q.spin, turns: q.turns, lid: q.lid, lidOpen: q.lidOpen, mold: q.mold.slice(), moldT: q.moldT });
   function remember(p) {
     (S.hist = S.hist || []).push({ plates: S.plates.map(snapPlate), left: { ...S.left }, combo: S.combo, moves: S.moves, lives: S.lives, served: S.served, piece: S.piece, pi: S.plates.indexOf(p) });
     if (S.hist.length > 20) S.hist.shift();
@@ -1022,8 +1119,10 @@
       if (q.spin && o.turns !== q.turns) { q.spinA = 1; q.spinDir = -1; }
       if (o.ice && !q.ice) q.iceIn = 1;
       if (q.lid && o.lidOpen !== q.lidOpen) q.shT = 0;
-      if (filled(q) !== o.slots.filter(Boolean).length) q.bounce = 1;
-      Object.assign(q, { ...o, slots: o.slots.slice() }); });
+      if (filled(q) !== o.slots.filter(Boolean).length + o.mold.filter(Boolean).length) q.bounce = 1;
+      o.mold.forEach((on, j) => { if (on && !q.mold[j]) q.moldGrow[j] = 0; });                // cleaned mold grows back
+      if (o.moldT !== q.moldT) q.moldBump = 1;
+      Object.assign(q, { ...o, slots: o.slots.slice(), mold: o.mold.slice() }); });
     const p = S.plates[h.pi], pc = h.piece;
     for (let k = 0; k < pc.size; k++) p.slots[(pc.start + k) % 6] = true;        // the piece lifts off its plate again...
     p.fruit = p.fruit || pc.fruit;
@@ -1040,7 +1139,7 @@
     if (armed === b.key) { armed = null; SFX.toggle(); return; }       // tap again to put the hammer down
     if (!(boostLeft[b.key] > 0)) { SFX.lock(); return showToast('Get more in the shop (full game)'); }
     if (b.key === 'rewind') {
-      const busy = fly || unfly || flyers.length || S.plates.some(q => q.pop || q.adding);
+      const busy = fly || unfly || flyers.length || S.plates.some(q => q.pop || q.adding || q.moldGrow.some(g => g < 0)) || particles.some(q => q.kind === 'spore');
       if (busy) return;                                        // wait until the last move has settled
       if (!S.hist || !S.hist.length) { SFX.nope(); return showToast('Nothing to rewind yet'); }
       rewind(); boostLeft.rewind--; refreshSpin = 1; armed = null;
@@ -1050,7 +1149,8 @@
       if (!spot) { SFX.nope(); return showToast('No room for another plate'); }
       const dx = spot[0] - GEN.x, dy = spot[1] - GEN.y, len = Math.hypot(dx, dy) || 1;
       S.plates.push({ fruit: null, slots: [false, false, false, false, false, false], x: spot[0], y: spot[1], ux: dx / len, uy: dy / len,
-        bounce: 0, pop: 0, shake: 0, enter: 0, exit: 0, delay: 0, ice: false, iceBreak: 0, adding: true });
+        bounce: 0, pop: 0, shake: 0, enter: 0, exit: 0, delay: 0, ice: false, iceBreak: 0, adding: true,
+        mold: E.map(Boolean), moldT: MOLD_EVERY, moldGrow: [1, 1, 1, 1, 1, 1], moldBump: 0 });
       boostLeft.plate--; armed = null; S.hist = []; SFX.boost(); SFX.whoosh(true);
     }
   }
@@ -1074,10 +1174,13 @@
     else if (p.ice) breakIce(p);
     else {
       const fruit = p.fruit, n = reduceMotion ? 6 : 16, fx = FX[fruit];
-      p.slots.forEach((on, j) => { if (!on) return; const a = -Math.PI / 2 + j * SEG + SEG / 2, v = 150 + Math.random() * 80;
-        particles.push({ kind: 'wedge', fruit, i: j, x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 80, life: .55, age: 0 }); });
-      for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 120 + Math.random() * 220, [sheet, list] = fx.small;
-        particles.push({ kind: 'sprite', sheet, src: list[(Math.random() * list.length) | 0], x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, s: .7 + Math.random() * .6, life: .7, age: 0, rot: a, vr: 0 }); }
+      if (fruit) {
+        p.slots.forEach((on, j) => { if (!on) return; const a = -Math.PI / 2 + j * SEG + SEG / 2, v = 150 + Math.random() * 80;
+          particles.push({ kind: 'wedge', fruit, i: j, x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 80, life: .55, age: 0 }); });
+        for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 120 + Math.random() * 220, [sheet, list] = fx.small;
+          particles.push({ kind: 'sprite', sheet, src: list[(Math.random() * list.length) | 0], x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, s: .7 + Math.random() * .6, life: .7, age: 0, rot: a, vr: 0 }); }
+      }
+      if (moldy(p)) cleanMold(p);
       p.slots = p.slots.map(() => false); p.fruit = null; SFX.thud();
     }
     p.bounce = 1; particles.push({ kind: 'ring', x: p.x, y: p.y, life: .4, age: 0 });
@@ -1177,7 +1280,8 @@
       particles.push({ kind: 'sprite', sheet: bs, src: bl[(Math.random() * bl.length) | 0], x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 180,
         s: .6 + Math.random() * .4, life: .9, age: 0, rot: 0, vr: (Math.random() - .5) * 10 });
     }
-    for (let i = 0; i < 6; i++) {
+    const fruitSlots = [0, 1, 2, 3, 4, 5].filter(i => p.slots[i]);       // mold slots do not count toward the goal
+    for (const i of fruitSlots) {
       const a = -Math.PI / 2 + i * SEG + SEG / 2, v = 150 + Math.random() * 60;
       particles.push({ kind: 'wedge', fruit, i, x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: .5, age: 0 });
     }
@@ -1186,7 +1290,7 @@
     const combo = S.combo > 1;
     particles.push({ kind: 'reward', x: p.x, y: p.y - 6, life: 1.15, age: 0, combo: S.combo,
       word: combo ? (S.lives < MAX_LIVES ? `Combo! +1 life` : `Combo x${S.combo}!`) : fx.words[(Math.random() * fx.words.length) | 0] });
-    for (let i = 0; i < 6; i++) flyers.push({ kind: 'slice', fruit, i, x0: p.x, y0: p.y, t: -.12 - i * .05, dur: .42, combo: S.combo });
+    fruitSlots.forEach((i, n) => flyers.push({ kind: 'slice', fruit, i, x0: p.x, y0: p.y, t: -.12 - n * .05, dur: .42, combo: S.combo, last: n === fruitSlots.length - 1 }));
     if (combo && S.livesShown && !S.comboTaught) {             // explain the first combo the player makes
       S.comboTaught = true; teach('combo');
       note = { text: 'Combo! A full plate\nback to back gives you\na life.', age: -.9, hold: true, spot: true };
@@ -1276,8 +1380,8 @@
     const btn = (act, label, cls = '') => `<button type="button" class="${cls}" data-act="${act}">${label}</button>`;
     testBody.innerHTML =
       sec('Play a level', `<div class="tgrid">${STAGE_NAMES.map((n, i) => btn('lvl:' + i, `${i + 1} · ${n}`)).join('')}</div>`) +
-      sec('Playgrounds', `<div class="tgrid">${btn('pg:ice', 'Ice', 'b')}${btn('pg:spin', 'Spinning plate', 'b')}${btn('pg:lid', 'Shutter', 'b')}${btn('pg:all', 'All obstacles', 'b')}</div>`) +
-      sec('Obstacle intros', `<div class="tgrid">${btn('intro:ice', 'Ice', 'o')}${btn('intro:spin', 'Spinning plate', 'o')}${btn('intro:lid', 'Shutter', 'o')}</div>`) +
+      sec('Playgrounds', `<div class="tgrid">${btn('pg:ice', 'Ice', 'b')}${btn('pg:spin', 'Spinning plate', 'b')}${btn('pg:lid', 'Shutter', 'b')}${btn('pg:mold', 'Mold', 'b')}${btn('pg:all', 'All obstacles', 'b')}</div>`) +
+      sec('Obstacle intros', `<div class="tgrid">${btn('intro:ice', 'Ice', 'o')}${btn('intro:spin', 'Spinning plate', 'o')}${btn('intro:lid', 'Shutter', 'o')}${btn('intro:mold', 'Mold', 'o')}</div>`) +
       sec('Screens', `<div class="tgrid">${btn('win', 'Win screen', 'o')}${btn('fail', 'Fail screen', 'o')}${btn('bus', 'Bus change', 'o')}${btn('menu', 'Main menu', 'b')}</div>`) +
       sec('Level on the Play button', `<div class="trow">${btn('lv-', '−', 'b')}<b id="testLv">${progress}</b>${btn('lv+', '+', 'b')}${btn('reset', 'Reset to 1', 'r')}</div>`) +
       sec('Options', `<label><input type="checkbox" id="testAutoBus"${TEST.autoBus ? ' checked' : ''}> Bus drives by itself on the menu</label>
@@ -1397,16 +1501,58 @@
   }
   function afterMove() {
     let spun = false, lids = 0;
+    const turn = a => a.map((_, i) => a[(i + 5) % 6]);
     for (const q of S.plates) {
-      if (q.spin && !q.pop) { q.slots = q.slots.map((_, i) => q.slots[(i + 5) % 6]); q.turns++; q.spinA = 1; q.spinDir = 1; spun = true; }
+      if (q.spin && !q.pop) { q.slots = turn(q.slots); q.mold = turn(q.mold); q.moldGrow = turn(q.moldGrow); q.turns++; q.spinA = 1; q.spinDir = 1; spun = true; }
       if (q.lid) { q.lidOpen = !q.lidOpen; q.shT = 0; if (q.lidOpen) lids++; }
     }
     if (spun) SFX.spin();
     if (lids) SFX.rollUp();
+    moldTick();
+  }
+  // mold counts down once per move; at 0 it spreads one slot to the neighbouring plate with the most room
+  // (or grows on its own plate), never filling a plate's last free slot
+  const moldRoom = q => !q.pop && !q.adding && !q.ice && !(q.lid && !q.lidOpen) && 6 - filled(q) >= 2;
+  function moldTick() {
+    let spread = 0;
+    for (const p of S.plates.filter(q => moldy(q) && !q.pop)) {
+      p.moldBump = 1;
+      if (--p.moldT > 0) continue;
+      p.moldT = MOLD_EVERY;
+      const d = q => Math.hypot(q.x - p.x, q.y - p.y);
+      const q = neighbours(p).filter(moldRoom).sort((a, b) => filled(a) - filled(b) || d(a) - d(b))[0] || (moldRoom(p) ? p : null);
+      if (!q) continue;
+      const toward = Math.atan2(p.y - q.y, p.x - q.x);
+      let best = -1, bd = 1e9;
+      for (let j = 0; j < 6; j++) {
+        if (q.slots[j] || q.mold[j]) continue;
+        const c = -Math.PI / 2 + j * SEG + SEG / 2;
+        const score = q === p ? (q.mold[(j + 1) % 6] || q.mold[(j + 5) % 6] ? 0 : 1)          // on its own plate: next to the patch
+                              : Math.abs(Math.atan2(Math.sin(c - toward), Math.cos(c - toward)));   // elsewhere: the slot facing the spores
+        if (score < bd - 1e-6) { bd = score; best = j; }
+      }
+      if (!moldy(q)) q.moldT = MOLD_EVERY;                   // a new patch starts its own count
+      q.mold[best] = true; q.moldGrow[best] = -.4; q.moldBump = 1;     // it grows once the spores land
+      const c = -Math.PI / 2 + best * SEG + SEG / 2;
+      particles.push({ kind: 'spore', x0: p.x + FRUIT_C[0], y0: p.y + FRUIT_C[1] - 6, x1: q.x + FRUIT_C[0] + Math.cos(c) * 30, y1: q.y + FRUIT_C[1] + Math.sin(c) * 30, life: .4, age: 0, self: q === p });
+      moldPuff(p.x + FRUIT_C[0], p.y + FRUIT_C[1] - 6, 6);
+      spread++;
+    }
+    if (spread) SFX.moldSpread();
+  }
+  function moldPuff(x, y, n, big = 1) {
+    for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = (40 + Math.random() * 70) * big;
+      particles.push({ kind: 'mpuff', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, life: .45 + Math.random() * .25, age: 0, drag: true, r: (4 + Math.random() * 4) * big }); }
+  }
+  function cleanMold(p) {                                    // served or smashed: the mold puffs away
+    p.mold.forEach((on, j) => { if (!on) return; const c = -Math.PI / 2 + j * SEG + SEG / 2;
+      moldPuff(p.x + FRUIT_C[0] + Math.cos(c) * 30, p.y + FRUIT_C[1] + Math.sin(c) * 30, reduceMotion ? 3 : 7, 1.3); });
+    p.mold = E.map(Boolean); p.moldGrow = [1, 1, 1, 1, 1, 1]; p.moldT = MOLD_EVERY;
+    SFX.moldClean();
   }
   function spawnPiece() {
     if (scene !== 'game' || S.phase !== 'play' || S.piece || fly || unfly) return;
-    const pending = f => flyers.filter(q => q.kind === 'slice' && q.fruit === f).length + S.plates.filter(q => q.pop && q.fruit === f).length * 6;
+    const pending = f => flyers.filter(q => q.kind === 'slice' && q.fruit === f).length + S.plates.filter(q => q.pop && q.fruit === f).reduce((a, q) => a + q.slots.filter(Boolean).length, 0);
     if (fruitsOf(cfg()).every(f => S.left[f] - pending(f) <= 0)) return;   // stage is finishing
     S.piece = newPiece(); S.pieceIn = 0; idle = 0; SFX.appear();
     if (!anyFit(S.piece)) endStage('moves');
@@ -1448,7 +1594,12 @@
       if (p.lid) { const t0 = p.shT; p.shT += dt;
         if (!p.lidOpen && t0 < SH.drop && p.shT >= SH.drop) shutterSlam(p); }
       p.rattle = Math.max(0, p.rattle - dt * 3); p.iceIn = Math.max(0, (p.iceIn || 0) - dt * 3);
-      if (p.pop > 0) { p.pop += dt * 14; if (p.pop >= 1) { p.pop = 0; explode(p, p.fruit); p.slots = p.slots.map(() => false); p.fruit = null; } }
+      p.moldBump = Math.max(0, p.moldBump - dt * 4);
+      for (let j = 0; j < 6; j++) if (p.moldGrow[j] < 1) {
+        const g0 = p.moldGrow[j]; p.moldGrow[j] = Math.min(1, g0 + dt * 2.6);
+        if (g0 < 0 && p.moldGrow[j] >= 0 && p.mold[j]) { const c = -Math.PI / 2 + j * SEG + SEG / 2; moldPuff(p.x + FRUIT_C[0] + Math.cos(c) * 30, p.y + FRUIT_C[1] + Math.sin(c) * 30, 5, .8); p.bounce = Math.max(p.bounce, .5); }
+      }
+      if (p.pop > 0) { p.pop += dt * 14; if (p.pop >= 1) { p.pop = 0; explode(p, p.fruit); if (moldy(p)) cleanMold(p); p.slots = p.slots.map(() => false); p.fruit = null; } }
     }
     for (const q of particles) {
       q.age += dt;
@@ -1475,7 +1626,7 @@
       SFX.tick(f.i, Math.min(f.combo - 1, 3));
       for (let j = 0; j < 3; j++) { const a = Math.random() * TAU, v = 60 + Math.random() * 90;
         sparks.push({ x: goalX(f.fruit), y: GOAL_ICON_Y + 8, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 5 + Math.random() * 4, age: 0, life: .5 + Math.random() * .3, rot: Math.random() * 3 }); }
-      if (f.i === 5) SFX.reward(f.combo);
+      if (f.last) SFX.reward(f.combo);
     }
     flyers = flyers.filter(f => !f.done);
 
@@ -1873,6 +2024,14 @@
         ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.scale(q.s, q.s);
         ctx.drawImage(A[q.sheet], sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh); ctx.restore();
       } else if (q.kind === 'wedge') { drawSlice(q.x, q.y, q.fruit, q.i, 1 - k * .4); }
+      else if (q.kind === 'mpuff') { ctx.globalAlpha = .7 * (1 - k); ctx.fillStyle = k < .3 ? '#ADD9A8' : '#8ABD8C'; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (1 + k * 1.2), 0, TAU); ctx.fill(); ctx.globalAlpha = 1; }
+      else if (q.kind === 'spore') {                         // a clump of spores hops over to its new plate
+        ctx.globalAlpha = 1;
+        for (let i = 2; i >= 0; i--) { const u = clamp01(k - i * .1), x = q.x0 + (q.x1 - q.x0) * u, y = q.y0 + (q.y1 - q.y0) * u - Math.sin(u * Math.PI) * (q.self ? 22 : 48), r = 6.5 - i * 1.8;
+          ctx.beginPath(); ctx.arc(x, y, r + 1.5, 0, TAU); ctx.fillStyle = '#3D6A4C'; ctx.fill();
+          ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = i ? '#8ABD8C' : '#ADD9A8'; ctx.fill();
+          if (!i) { ctx.beginPath(); ctx.arc(x - 2, y - 2, 1.8, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fill(); } }
+      }
       else if (q.kind === 'dust') { ctx.globalAlpha = .55 * (1 - k); ctx.fillStyle = '#F4EEE6'; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (1 + k * 1.4), 0, TAU); ctx.fill(); ctx.globalAlpha = 1; }
       else if (q.kind === 'slat') { ctx.save(); ctx.globalAlpha = 1 - k * k; ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.fillStyle = '#6DB3F7'; ctx.fillRect(-q.w / 2, -5, q.w, 10);
         ctx.fillStyle = '#2E6FCF'; ctx.fillRect(-q.w / 2, 3.5, q.w, 1.6); ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(-q.w / 2, -4, q.w, 1.3); ctx.restore(); }
