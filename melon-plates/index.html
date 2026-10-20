@@ -175,14 +175,15 @@
     { n: 6, goals: { m: 18, l: 12, k: 12 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true,
       pre: [['m',[1,1,1,0,0,0],'lid'], ['l',[0,1,1,0,0,0]], ['k',[0,0,1,1,0,0],'spin'], [null,E], ['m',[0,0,0,1,1,1],'lidOpen'], ['k',[1,1,0,0,0,0]]],
       script: [] },
-    // spider: covers one spot (`spider` is [plate, spot]); after every move it jumps onto the plate you just used
-    { n: 4, goals: { m: 12, l: 6 }, hintDelay: 1.5, pFit: 1, obstIntro: 'spider', intro: '', spider: [0, 3],
-      pre: [['m',[1,1,1,0,0,0]], ['l',[1,1,1,1,0,0]], [null,E], ['m',[1,1,0,0,0,0]]],
-      script: [{ fruit:'l', start:4, size:2, hint:1, tip: 'A spider covers a spot!\nServe the lemons first' },
-               { fruit:'m', start:3, size:3, hint:0, tip: 'It jumped to the plate\nyou just used!' },
-               { fruit:'m', start:2, size:3, hint:3 }] },
-    { n: 6, goals: { m: 18, l: 12, k: 12 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true, spider: [3, 3],
-      pre: [['m',[1,1,0,0,0,0]], ['l',[0,0,1,1,0,0]], [null,E], ['k',[1,1,1,0,0,0]], ['m',[0,0,1,1,1,0],'ice'], [null,E]],
+    // spider: sits on one spot of its plate ('spider', spot) and hops to the next free spot after every move;
+    // fill the rest of its plate to collect it (goal x)
+    { n: 4, goals: { m: 10, l: 5, x: 2 }, hintDelay: 1.5, pFit: 1, obstIntro: 'spider', intro: '',
+      pre: [['m',[1,1,1,0,0,0],'spider',3], [null,E], ['m',[1,1,0,0,0,0]], ['l',[1,1,1,0,0,0],'spider',3]],
+      script: [{ fruit:'m', start:4, size:2, hint:0, tip: 'Fill the spider\u2019s plate\nto collect it!' },
+               { fruit:'l', start:5, size:1, hint:3, tip: 'Spiders hop to the next\nfree spot every move' },
+               { fruit:'l', start:4, size:1, hint:3 }] },
+    { n: 6, goals: { m: 18, k: 12, x: 3 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true,
+      pre: [['m',[1,1,0,0,0,0],'spider',3], ['k',[0,0,1,1,0,0]], [null,E,'spider',0], ['k',[1,1,1,0,0,0]], ['m',[0,0,1,1,1,0],'ice'], ['m',[0,0,0,0,1,1],'spider',1]],
       script: [] },
     // fruit plate: only takes one fruit, shown by its tint and badge ('onlyM', 'onlyL', 'onlyK')
     { n: 4, goals: { m: 12, l: 12 }, hintDelay: 1.5, pFit: 1, obstIntro: 'only', intro: '',
@@ -203,12 +204,12 @@
       pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,0,0,0]], [null,E,'spin'], ['m',[0,0,1,1,1,0]], ['l',[1,0,0,0,1,1],'spin'], [null,E]], script: [] },
     lid: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Shutter playground',
       pre: [['m',[1,1,1,0,0,0],'lid'], ['l',[0,1,1,0,0,0]], [null,E,'lidOpen'], ['m',[0,0,1,1,0,0]], ['l',[1,1,0,0,0,1],'lid'], [null,E]], script: [] },
-    spider: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Spider playground', spider: [2, 0],
-      pre: [['m',[1,1,0,0,0,0]], ['l',[0,1,1,0,0,0]], [null,E], ['m',[0,0,1,1,1,0]], ['l',[1,0,0,0,1,1]], [null,E]], script: [] },
+    spider: { n: 6, goals: { m: 24, l: 24, x: 4 }, hintDelay: 8, pFit: .95, intro: 'Spider playground',
+      pre: [['m',[1,1,0,0,0,0],'spider',3], ['l',[0,1,1,0,0,0]], [null,E,'spider',0], ['m',[0,0,1,1,1,0],'spider',0], ['l',[1,0,0,0,1,1],'spider',2], [null,E]], script: [] },
     only: { n: 6, goals: { m: 18, l: 18, k: 18 }, hintDelay: 8, pFit: .95, intro: 'Fruit plate playground',
       pre: [[null,E,'onlyM'], ['l',[0,1,1,0,0,0]], [null,E,'onlyK'], ['m',[0,0,1,1,0,0]], [null,E,'onlyL'], [null,E]], script: [] },
-    all: { n: 6, goals: { m: 18, l: 18, k: 18 }, hintDelay: 8, pFit: .95, intro: 'All obstacles', spider: [3, 0],
-      pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,1,0,0],'ice'], ['k',[1,1,1,0,0,0],'lid'], [null,E], ['m',[0,0,1,1,0,0],'onlyM'], ['k',[0,0,0,0,1,1],'lidOpen']], script: [] },
+    all: { n: 6, goals: { m: 18, l: 18, k: 18, x: 1 }, hintDelay: 8, pFit: .95, intro: 'All obstacles',
+      pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,1,0,0],'ice'], ['k',[1,1,1,0,0,0],'lid'], [null,E,'spider',0], ['m',[0,0,1,1,0,0],'onlyM'], ['k',[0,0,0,0,1,1],'lidOpen']], script: [] },
   };
 
   const load = src => { const i = new Image(); i.src = src; return i; };
@@ -244,22 +245,23 @@
   // ---------- state ----------
   const VERSION = 11;
   let S, scene = 'menu';
-  let fly = null, particles = [], flyers = [], sparks = [], hudBump = { m:0, l:0, k:0 }, hudFlash = 0, t = 0, idle = 0,
+  let fly = null, particles = [], flyers = [], sparks = [], hudBump = { m:0, l:0, k:0, x:0 }, hudFlash = 0, t = 0, idle = 0,
       toast = null, note = null, badgeKey = '', badgeFx = 0, gearSpin = 0, lockWiggle = [0,0,0], fade = 0, btnPress = 0, redFlash = 0,
       heartFx = Array(7).fill(0), heartBreak = Array(7).fill(0);
 
   const cfg = () => S.def || STAGES[S.stage];
-  const fruitsOf = st => Object.keys(st.goals);
+  const goalsOf = st => Object.keys(st.goals);                      // fruit goals, plus x for spiders
+  const fruitsOf = st => goalsOf(st).filter(g => g !== 'x');
   function makePlates(st) {
     const centres = st.board ? st.board.plates : LAYOUT[st.n].map(pi => POS[pi]);
     [GEN.x, GEN.y] = st.board ? st.board.gen : LEVEL_GEN;
     return centres.map(([cx, cy], i) => {
-      const [fruit, slots, obstacle] = st.pre[i];
+      const [fruit, slots, obstacle, extra] = st.pre[i];
       const dx = cx - GEN.x, dy = cy - GEN.y, len = Math.hypot(dx, dy) || 1;
       return { fruit, slots: slots.map(Boolean), x: cx, y: cy, ux: dx / len, uy: dy / len,
                bounce: 0, pop: 0, shake: 0, enter: 0, exit: 0, delay: i * .07, ice: obstacle === 'ice', iceBreak: 0,
                spin: obstacle === 'spin', spinA: 0, turns: 0, lid: obstacle === 'lid' || obstacle === 'lidOpen', lidOpen: obstacle === 'lidOpen',
-               shT: 9, rattle: 0, only: /^only/.test(obstacle || '') ? obstacle[4].toLowerCase() : null };
+               shT: 9, rattle: 0, spider: obstacle === 'spider' ? extra : null, spFrom: null, spT: 1, spLand: -9, spStartle: 0, spAngry: 0, only: /^only/.test(obstacle || '') ? obstacle[4].toLowerCase() : null };
     });
   }
   // the lives / combo / wrong-plate explanations show once on this device, ever
@@ -273,7 +275,6 @@
     if (!st.hideLives && !st.livesIntro) S.livesShown = true;
     Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0,
                        piece: null, pieceIn: 0, phase: 'in', phaseT: 0 });
-    S.spider = st.spider ? { i: st.spider[0], slot: st.spider[1], from: null, t: 1, shake: 0 } : null;
     if (st.obstIntro && !(S.seen || {})[st.obstIntro]) { S.phase = 'obstacle'; S.introKey = st.obstIntro; SFX.obstacle(); }   // the obstacle intro comes before the board
     fly = null; flyers = []; idle = 0;
     SFX.whoosh(true);
@@ -281,12 +282,10 @@
 
   const fits = (p, pc) => {
     if (p.pop || p.ice || (p.lid && !p.lidOpen) || (p.fruit && p.fruit !== pc.fruit) || (p.only && p.only !== pc.fruit)) return false;
-    for (let k = 0; k < pc.size; k++) if (p.slots[(pc.start + k) % 6] || spiderAt(p, (pc.start + k) % 6)) return false;
+    for (let k = 0; k < pc.size; k++) if (p.slots[(pc.start + k) % 6] || p.spider === (pc.start + k) % 6) return false;
     return true;
   };
-  const filled = p => p.slots.filter(Boolean).length;
-  const spiderOn = p => !!S.spider && S.plates[S.spider.i] === p;
-  const spiderAt = (p, j) => spiderOn(p) && S.spider.slot === j;
+  const filled = p => p.slots.filter(Boolean).length + (p.spider != null ? 1 : 0);     // a spider fills its spot
   const neighbours = p => S.plates.filter(q => q !== p && Math.hypot(q.x - p.x, q.y - p.y) < 200);
   const anyFit = pc => S.plates.some(p => fits(p, pc));
 
@@ -457,10 +456,10 @@
     rollUp() { for (let i = 0; i < 6; i++) tone({ f0: 520 + i * 70, dur: .025, vol: .028, type: 'triangle', delay: .09 + i * .035 }); hiss({ dur: .24, vol: .03, type: 'bandpass', f0: 900, f1: 2200, q: 1.5, delay: .08 }); },   // shutter rattles up
     slam() { tone({ f0: 150, f1: 70, dur: .16, vol: .2 }); hiss({ dur: .1, vol: .06, type: 'lowpass', f0: 1400 }); tone({ f0: 640, f1: 600, dur: .08, vol: .025, type: 'triangle', delay: .02 }); },   // door hits the rim
     rattle() { for (let i = 0; i < 4; i++) tone({ f0: 420 + (i % 2) * 60, dur: .025, vol: .03, type: 'triangle', delay: i * .045 }); },                     // tapping a closed shutter
-    hop() {                                                               // the spider skitters, springs and lands
-      for (let i = 0; i < 4; i++) hiss({ dur: .018, vol: .05, type: 'bandpass', f0: 2600 + i * 300, q: 5, delay: i * .03 });
-      tone({ f0: 320, f1: 620, dur: .13, vol: .05, delay: .1 }); tone({ f0: 210, f1: 120, dur: .07, vol: .06, delay: .5 });
-    },
+    hop() { tone({ f0: 620, f1: 980, dur: .06, vol: .03, delay: .08 }); },                        // a spider springs off...
+    tap() { hiss({ dur: .025, vol: .04, type: 'bandpass', f0: 2600, q: 4 }); tone({ f0: 300, f1: 200, dur: .05, vol: .03 }); },   // ...and lands
+    cheer() { tone({ f0: 520, f1: 780, dur: .1, vol: .04 }); tone({ f0: 660, f1: 990, dur: .1, vol: .04, delay: .14 }); hiss({ dur: .3, vol: .025, type: 'bandpass', f0: 1800, f1: 4200, q: 2, delay: .5 }); },   // yay, then the thread zips up
+    spiderGet() { bell(PENTA[7], .05); bell(PENTA[9], .045, .07); tone({ f0: 300, f1: 160, dur: .08, vol: .05 }); },   // into the goal
     rewind() { hiss({ dur: .26, vol: .05, type: 'bandpass', f0: 2400, f1: 700, q: 1 }); bell(PENTA[7], .05, .02); bell(PENTA[4], .05, .12); },              // back in time
     coin() { bell(PENTA[9], .06); tone({ f0: 2093, dur: .07, vol: .025, delay: .05 }); },
     win() { [0, 2, 4, 5, 7].forEach((n, i) => bell(PENTA[n], .1, i * .1)); bell(PENTA[9], .1, .55); bell(PENTA[7], .08, .55); },
@@ -505,6 +504,7 @@
     if (p.shake) { ctx.beginPath(); ctx.arc(0, 0, PLATE_R - 1, 0, TAU); ctx.strokeStyle = `rgba(255,77,77,${p.shake})`; ctx.lineWidth = 5; ctx.stroke(); }
     if (turn) { ctx.save(); ctx.translate(FRUIT_C[0], FRUIT_C[1]); ctx.rotate(turn); ctx.translate(-FRUIT_C[0], -FRUIT_C[1]); }
     p.slots.forEach((on, j) => { if (on) drawSlice(0, 0, p.fruit, j); });
+    if (p.spider != null) { const d = Math.hypot(GEN.x - p.x, GEN.y - p.y) || 1; drawPlateSpider(p, [(GEN.x - p.x) / d, (GEN.y - p.y) / d]); }   // eyes on the next piece
     if (turn) ctx.restore();
     if (p.spin) drawSpinBadge(p.turns * SEG + turn);
     if (p.ice) drawIce(p.slots, 1 - (p.iceIn || 0));
@@ -544,69 +544,76 @@
   // ---------- fruit plate: a plain plate with faint slices of its fruit printed in the empty spots ----------
   const ONLY = { m: 'Melons', l: 'Lemons', k: 'Kiwis' };
   function drawOnly(f) { for (let j = 0; j < 6; j++) drawSlice(0, 0, f, j, 1, .26); }
-  // ---------- spider: sits on one spot of a plate; after every move it jumps onto the plate you just used ----------
-  // stand-in art, drawn in code until the rendered spider image is in
-  function drawSpiderAt(x, y, s = 1, tuck = 0, blink = 0) {
+  // ---------- spider: sits on one spot of its plate and hops to the next free spot after every move ----------
+  // stand-in art, drawn in code until the rendered spider image is in.
+  // o: tuck (legs pulled in mid-hop), blink, look [x, y] for the pupils, happy (^ ^ eyes), scared (wide eyes), angry (brows)
+  const blinkAt = seed => ((t + seed * 1.37) % 3.4) < .13 ? 1 : 0;
+  function drawSpiderAt(x, y, s = 1, o = {}) {
+    const tuck = o.tuck || 0, look = o.look || [0, 0];
     ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    // eight legs: dark tubes with a lighter core so they read round; they tuck in while it jumps
-    for (const side of [-1, 1]) for (let k = 0; k < 4; k++) {
-      const tap = k === 1 && side === 1 ? Math.max(0, Math.sin(t * 5)) * 2.5 : 0, f = 1 - tuck * .45;
-      const th = [-1.05, -.42, .2, .78][k], ax = side * 8 * Math.cos(th * .6), ay = 9 * Math.sin(th * .8);           // fanned out: front legs reach up, back legs down
+    for (const side of [-1, 1]) for (let k = 0; k < 4; k++) {                 // legs tap in a little wave
+      const tap = Math.max(0, Math.sin(t * 7 - k * 1.1 + (side > 0 ? 1.6 : 0))) * 2.2 * (1 - tuck), f = 1 - tuck * .4;
+      const th = [-1.05, -.42, .2, .78][k], ax = side * 8 * Math.cos(th * .6), ay = 9 * Math.sin(th * .8);
       const kx = ax + side * Math.cos(th - .55) * 13 * f, ky = ay + Math.sin(th - .55) * 13 * f - tap, fx = kx + side * Math.cos(th + .95) * 11 * f, fy = ky + Math.sin(th + .95) * 11 * f;
       const leg = () => { ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(kx, ky - 4, kx, ky); ctx.quadraticCurveTo(kx + side * 3, (ky + fy) / 2, fx, fy); };
-      leg(); ctx.lineWidth = 4.6; ctx.strokeStyle = '#1C0E33'; ctx.stroke();
-      ctx.save(); ctx.translate(-.4, -.7); leg(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#7B5CC2'; ctx.stroke(); ctx.restore();
+      leg(); ctx.lineWidth = 4.8; ctx.strokeStyle = '#1C0E33'; ctx.stroke();
+      ctx.save(); ctx.translate(-.4, -.7); leg(); ctx.lineWidth = 1.7; ctx.strokeStyle = '#7B5CC2'; ctx.stroke(); ctx.restore();
     }
-    // body: a glossy ball, lit from the top left, with a cool rim light
-    ctx.fillStyle = 'rgba(20,10,40,.25)'; ctx.beginPath(); ctx.arc(1, 2, 16, 0, TAU); ctx.fill();
-    const g = ctx.createRadialGradient(-5, -7, 1, 0, 0, 16);
+    const g = ctx.createRadialGradient(-5, -7, 1, 0, 0, 16);                    // glossy body, lit from the top left
     g.addColorStop(0, '#A98AF0'); g.addColorStop(.35, '#6440B0'); g.addColorStop(.8, '#2E1758'); g.addColorStop(1, '#1C0E33');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 15.5, 0, TAU); ctx.fill();
     ctx.beginPath(); ctx.arc(0, 0, 14, .1 * Math.PI, .7 * Math.PI); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(170,140,255,.55)'; ctx.stroke();
     ctx.beginPath(); ctx.ellipse(-6, -9, 4.6, 2.6, -.5, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fill();
     ctx.beginPath(); ctx.arc(-1.5, -11.5, 1.1, 0, TAU); ctx.fill();
-    // big shiny eyes, blinking now and then
-    for (const ex of [-5.2, 5.2]) {
-      ctx.save(); ctx.translate(ex, 1); ctx.scale(1, 1 - blink * .9);
-      const eg = ctx.createRadialGradient(-1.5, -2, .5, 0, 0, 5.6); eg.addColorStop(0, '#FFFFFF'); eg.addColorStop(1, '#D8DEF0');
-      ctx.beginPath(); ctx.arc(0, 0, 5.4, 0, TAU); ctx.fillStyle = eg; ctx.fill();
-      ctx.beginPath(); ctx.arc(.4, 1, 3, 0, TAU); ctx.fillStyle = '#140A26'; ctx.fill();
-      ctx.beginPath(); ctx.arc(-.6, -.2, 1.1, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+    for (const ex of [-5.6, 5.6]) {                                           // big eyes
+      ctx.save(); ctx.translate(ex, 1);
+      if (o.happy) { ctx.beginPath(); ctx.arc(0, 1.5, 3.6, 1.1 * Math.PI, 1.9 * Math.PI); ctx.lineWidth = 2.4; ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.restore(); continue; }
+      const er = o.scared ? 6.6 : 6, blink = o.blink || 0; ctx.scale(1, 1 - blink * .9);
+      const eg = ctx.createRadialGradient(-1.5, -2, .5, 0, 0, er); eg.addColorStop(0, '#FFFFFF'); eg.addColorStop(1, '#D8DEF0');
+      ctx.beginPath(); ctx.arc(0, 0, er, 0, TAU); ctx.fillStyle = eg; ctx.fill();
+      const pr = o.scared ? 2.2 : 3.3; ctx.beginPath(); ctx.arc(look[0] * 1.6, .6 + look[1] * 1.6, pr, 0, TAU); ctx.fillStyle = '#140A26'; ctx.fill();
+      ctx.beginPath(); ctx.arc(look[0] * 1.6 - 1, look[1] * 1.6 - .6, 1.15, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
       ctx.restore();
+      if (o.angry) { ctx.beginPath(); ctx.moveTo(ex - 4.5 * Math.sign(ex) * -1, -6.5); ctx.lineTo(ex + 3 * Math.sign(ex) * -1, -4); ctx.lineWidth = 2.4; ctx.strokeStyle = '#140A26'; ctx.stroke(); }
     }
-    // little fangs
-    ctx.fillStyle = '#F4F0FF'; for (const fx of [-2.2, 2.2]) { ctx.beginPath(); ctx.moveTo(fx - 1.3, 8); ctx.lineTo(fx + 1.3, 8); ctx.lineTo(fx, 10.8); ctx.closePath(); ctx.fill(); }
+    if (o.happy) { ctx.beginPath(); ctx.arc(0, 6.5, 3.8, .1 * Math.PI, .9 * Math.PI); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+    else { ctx.fillStyle = '#F4F0FF'; for (const fx of [-2.3, 2.3]) { ctx.beginPath(); ctx.moveTo(fx - 1.3, 8.4); ctx.lineTo(fx + 1.3, 8.4); ctx.lineTo(fx, 11.2); ctx.closePath(); ctx.fill(); } }
     ctx.restore();
   }
-  // where a spot sits in screen space, following the plate as it slides and turns
-  function spotPos(q, slot) {
-    const [ox, oy] = plateOffset(q), turn = q.spin ? -SEG * (1 - back(1 - q.spinA)) * (q.spinDir || 1) : 0, a = -Math.PI / 2 + (slot + .5) * SEG + turn;
-    return [q.x + ox + FRUIT_C[0] + Math.cos(a) * 31, q.y + oy + FRUIT_C[1] + Math.sin(a) * 31];
+  const SPIDER_S = .6, SPIDER_R = 35, HOP = .5;                               // size on a plate (fits one spot), distance from the middle, hop time
+  const spotXY = (slot, r = SPIDER_R) => { const a = -Math.PI / 2 + (slot + .5) * SEG; return [FRUIT_C[0] + Math.cos(a) * r, FRUIT_C[1] + Math.sin(a) * r]; };
+  // drawn inside the plate's transform, so it turns with a spinning plate and slides with the plate
+  function drawPlateSpider(p, look = [0, 0]) {
+    const from = p.spFrom == null ? p.spider : p.spFrom, u = p.spT;
+    let n = (p.spider - from + 6) % 6; if (p.spBack && n) n -= 6;                // a rewind hops back the short way round
+    const an = Math.abs(n);
+    const hu = clamp01((u - .2) / .8), k = hu < .5 ? 2 * hu * hu : 1 - 2 * (1 - hu) * (1 - hu);
+    const a = -Math.PI / 2 + (from + .5 + n * k) * SEG, lift = Math.sin(k * Math.PI) * (an ? 14 + an * 5 : 10);
+    const x = FRUIT_C[0] + Math.cos(a) * SPIDER_R, y = FRUIT_C[1] + Math.sin(a) * SPIDER_R;
+    // crouch before the hop, squash on landing
+    const since = t - p.spLand, crouch = u < .2 ? Math.sin(u / .2 * Math.PI) * .16 : 0, land = since < .35 ? Math.sin(since * 26) * .14 * (1 - since / .35) : 0, sq = crouch + land;
+    const shake = p.spAngry ? Math.sin(t * 55) * 2.2 * p.spAngry : 0;
+    ctx.save(); ctx.globalAlpha = .26 * (1 - lift / 40); ctx.fillStyle = '#2A1A40';
+    ctx.beginPath(); ctx.ellipse(x, y + 9.5, 11 * (1 - lift / 60), 3.4 * (1 - lift / 60), 0, 0, TAU); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(x + shake, y - lift + 2); ctx.rotate(an > 1 ? k * TAU * Math.sign(n) : Math.sin(k * Math.PI) * .35 * n); ctx.scale(1 + sq, 1 - sq); ctx.translate(0, -2);
+    drawSpiderAt(0, Math.sin(t * 3 + p.x) * .6, SPIDER_S, { tuck: Math.sin(k * Math.PI), blink: blinkAt(p.x + p.y), look, scared: p.spStartle > .05 || (u < 1 && u > .2), angry: p.spAngry > .05 });
+    ctx.restore();
   }
-  function drawSpider() {
-    const s = S.spider; if (!s || !S.plates[s.i]) return;
-    let [x, y] = spotPos(S.plates[s.i], s.slot), lift = 0;
-    if (s.t < 1 && s.from) {
-      const [x0, y0] = spotPos(S.plates[s.from[0]], s.from[1]), u = s.t < .5 ? 2 * s.t * s.t : 1 - 2 * (1 - s.t) * (1 - s.t);
-      lift = Math.sin(u * Math.PI); x = x0 + (x - x0) * u; y = y0 + (y - y0) * u;
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x, y - lift * 60); ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(255,255,255,${.8 * (1 - u * .6)})`; ctx.stroke();   // its silk thread
+  // after every move each spider hops clockwise to the next free spot on its plate (it stays put when there is none)
+  function spidersHop(used) {
+    let hops = 0;
+    for (const q of S.plates) {
+      if (q.spider == null || q.pop) continue;
+      for (let k = 1; k < 6; k++) { const j = (q.spider + k) % 6; if (!q.slots[j]) { q.spFrom = q.spider; q.spider = j; q.spT = 0; q.spBack = false; hops++; break; } }
+      if (q === used) q.spStartle = 1;
     }
-    const sq = s.t < 1 ? 0 : Math.max(0, 1 - (t - s.landT) * 5) * Math.sin((t - s.landT) * 30) * .12;     // squash on landing
-    const sh = s.shake ? Math.sin(t * 60) * 3 * s.shake : 0, blink = (t % 3.3) < .12 ? 1 : 0;
-    ctx.save(); ctx.globalAlpha = .25 * (1 - lift * .6); ctx.fillStyle = '#2A1A40';
-    ctx.beginPath(); ctx.ellipse(x, y + 14, 18 * (1 - lift * .3), 5 * (1 - lift * .3), 0, 0, TAU); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(x + sh, y - lift * 60 + Math.sin(t * 2.4) * .8); ctx.scale(1 + sq, 1 - sq);
-    drawSpiderAt(0, 0, 1 + lift * .1, lift, blink); ctx.restore();
+    if (hops) SFX.hop();
   }
-  // the spider takes the first free spot after the slices you just placed (any spot if that plate is being served)
-  function spiderJump(i, slot) {
-    const s = S.spider; s.from = [s.i, s.slot]; s.i = i; s.slot = slot; s.t = 0; SFX.hop();
-  }
-  function spiderFollow(used, pc) {
-    const s = S.spider, i = S.plates.indexOf(used);
-    if (!s || i < 0 || i === s.i) return;
-    const start = (pc.start + pc.size) % 6;
-    for (let k = 0; k < 6; k++) { const j = (start + k) % 6; if (used.pop || !used.slots[j]) return spiderJump(i, j); }
+  // its plate was served: the spider cheers, then a silk thread reels it up to its goal
+  function collectSpider(p) {
+    const [sx, sy] = spotXY(p.spider);
+    flyers.push({ kind: 'spider', x0: p.x + sx, y0: p.y + sy, t: -.55, dur: .7 });
+    p.spider = null; p.spFrom = null; SFX.cheer();
   }
   // ---------- shutter: a roller door that slides over the plate, inside its rim ----------
   // Closing it drops like a garage door and slams with a little bounce; opening it tugs down, then rolls up fast.
@@ -766,14 +773,11 @@
     lid: { title: 'Shutter', word: 'SHUTTER', lines: ['The SHUTTER opens and', 'closes after every move!'],
       demo() { const c = t % 2.8, open = c >= 1.4, k = shutterK(open, open ? c - 1.4 : c);
         ctx.drawImage(A.plate, -MC[0], -MC[1]); [1, 1, 1, 1, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawShutter(k); } },
-    spider: { title: 'Spider', word: 'SPIDER', lines: ['A SPIDER covers a spot.', 'It jumps where you play!'],
-      demo() { ctx.drawImage(A.plate, -MC[0], -MC[1]); [1, 1, 1, 0, 0, 0].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); });
-        const c = t % 2.4, u = clamp01((c - 1.6) / .5), from = Math.floor(t / 2.4) % 2 ? 5 : 3, to = from === 3 ? 5 : 3;     // hops between two spots
-        const at = j => { const a = -Math.PI / 2 + (j + .5) * SEG; return [FRUIT_C[0] + Math.cos(a) * 31, FRUIT_C[1] + Math.sin(a) * 31]; };
-        const [x0, y0] = at(from), [x1, y1] = at(to), k = u < .5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u), lift = Math.sin(k * Math.PI);
-        const x = x0 + (x1 - x0) * k, y = y0 + (y1 - y0) * k;
-        ctx.save(); ctx.globalAlpha = .25 * (1 - lift * .6); ctx.fillStyle = '#2A1A40'; ctx.beginPath(); ctx.ellipse(x, y + 14, 18, 5, 0, 0, TAU); ctx.fill(); ctx.restore();
-        drawSpiderAt(x, y - lift * 34, 1.1, lift, (t % 3.3) < .12 ? 1 : 0); } },
+    spider: { title: 'Spider', word: 'SPIDER', lines: ['Collect the SPIDER by', 'filling its plate!'],
+      demo() { ctx.drawImage(A.plate, -MC[0], -MC[1]); [1, 1, 0, 0, 1, 0].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); });
+        const free = [2, 3, 5], c = t / 1.3, i = Math.floor(c) % 3, u = clamp01((c % 1) * 1.3 / HOP);          // hops around the free spots
+        const d = { spider: free[(i + 1) % 3], spFrom: free[i], spT: u, spLand: t - (c % 1) * 1.3 + HOP, spStartle: 0, spAngry: 0, x: 0, y: 0 };
+        drawPlateSpider(d, [Math.sin(t * .8), .3]); } },
     only: { title: 'Fruit Plate', word: 'FRUIT PLATE', lines: ['A FRUIT PLATE only takes', 'the fruit printed on it!'],
       demo() { ctx.drawImage(A.plate, -MC[0], -MC[1]); drawOnly('l'); [1, 1, 0, 0, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'l', j); }); } },
   };
@@ -1003,7 +1007,7 @@
     ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x - 1.5, y + 4); ctx.lineTo(x + 5.5, y - 4);
     ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
   }
-  const goalX = f => { const fr = fruitsOf(cfg()), i = fr.indexOf(f); return fr.length === 1 ? 201 : fr.length === 2 ? (i ? 244 : 162) : [140, 201, 262][i]; };
+  const goalX = f => { const fr = goalsOf(cfg()), i = fr.indexOf(f); return fr.length === 1 ? 201 : fr.length === 2 ? (i ? 244 : 162) : fr.length === 3 ? [140, 201, 262][i] : [128, 176, 226, 274][i]; };
   // the bar redrawn above a spotlight dim (ropes hidden, they sit behind the goal bar)
   function drawBarLit() { ctx.save(); ctx.beginPath(); ctx.rect(0, HEARTS.y - 24, W, 60); ctx.clip(); drawLivesBar(); ctx.restore(); }
   function drawLivesBar() { if (S.livesShown) ctx.drawImage(A.livesBar, LIVES_BAR.x, LIVES_BAR.y); }
@@ -1042,9 +1046,10 @@
     ctx.drawImage(A.hud, 79, 62);
     drawBadge();
     if (hudFlash) { ctx.beginPath(); ctx.roundRect(92, 70, 218, 50, 25); ctx.fillStyle = `rgba(255,236,150,${hudFlash * .55})`; ctx.fill(); }
-    for (const f of fruitsOf(cfg())) {
-      const x = goalX(f), s = 1 + hudBump[f] * .28, im = A[ICONS[f]];
-      ctx.save(); ctx.translate(x, GOAL_ICON_Y); ctx.scale(s, s); ctx.drawImage(im, -im.width / 2, -im.height / 2); ctx.restore();
+    for (const f of goalsOf(cfg())) {
+      const x = goalX(f), s = 1 + hudBump[f] * .28;
+      if (f === 'x') { ctx.save(); ctx.translate(x, GOAL_ICON_Y + 1); ctx.scale(s, s); drawSpiderAt(0, 0, .56, { blink: blinkAt(7), happy: hudBump.x > .2 }); ctx.restore(); }
+      else { const im = A[ICONS[f]]; ctx.save(); ctx.translate(x, GOAL_ICON_Y); ctx.scale(s, s); ctx.drawImage(im, -im.width / 2, -im.height / 2); ctx.restore(); }
       if (S.left[f] === 0) { drawCheck(x, GOAL_NUM_Y); continue; }
       ctx.save(); ctx.translate(x, GOAL_NUM_Y); ctx.scale(s, s);
       ctx.font = '900 18px "Goldplay", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; if ('letterSpacing' in ctx) ctx.letterSpacing = '-0.9px';
@@ -1118,9 +1123,9 @@
   }
   // ---------- rewind: every placed piece leaves a snapshot; rewinding puts the board back and the piece flies home ----------
   let unfly = null;
-  const snapPlate = q => ({ fruit: q.fruit, slots: q.slots.slice(), ice: q.ice, spin: q.spin, turns: q.turns, lid: q.lid, lidOpen: q.lidOpen });
+  const snapPlate = q => ({ fruit: q.fruit, slots: q.slots.slice(), spider: q.spider, ice: q.ice, spin: q.spin, turns: q.turns, lid: q.lid, lidOpen: q.lidOpen });
   function remember(p) {
-    (S.hist = S.hist || []).push({ plates: S.plates.map(snapPlate), spider: S.spider ? [S.spider.i, S.spider.slot] : null, left: { ...S.left }, combo: S.combo, moves: S.moves, lives: S.lives, served: S.served, piece: S.piece, pi: S.plates.indexOf(p) });
+    (S.hist = S.hist || []).push({ plates: S.plates.map(snapPlate), left: { ...S.left }, combo: S.combo, moves: S.moves, lives: S.lives, served: S.served, piece: S.piece, pi: S.plates.indexOf(p) });
     if (S.hist.length > 20) S.hist.shift();
   }
   function rewind() {
@@ -1129,9 +1134,9 @@
       if (q.spin && o.turns !== q.turns) { q.spinA = 1; q.spinDir = -1; }
       if (o.ice && !q.ice) q.iceIn = 1;
       if (q.lid && o.lidOpen !== q.lidOpen) q.shT = 0;
-      if (filled(q) !== o.slots.filter(Boolean).length) q.bounce = 1;
+      if (o.spider !== q.spider && o.spider != null) { q.spFrom = q.spider != null ? q.spider : o.spider; q.spT = 0; q.spBack = true; }   // spiders hop back (or drop back in)
+      if (filled(q) !== o.slots.filter(Boolean).length + (o.spider != null ? 1 : 0)) q.bounce = 1;
       Object.assign(q, { ...o, slots: o.slots.slice() }); });
-    if (S.spider && h.spider && (h.spider[0] !== S.spider.i || h.spider[1] !== S.spider.slot)) spiderJump(...h.spider);   // the spider jumps back too
     const p = S.plates[h.pi], pc = h.piece;
     for (let k = 0; k < pc.size; k++) p.slots[(pc.start + k) % 6] = true;        // the piece lifts off its plate again...
     p.fruit = p.fruit || pc.fruit;
@@ -1148,7 +1153,7 @@
     if (armed === b.key) { armed = null; SFX.toggle(); return; }       // tap again to put the hammer down
     if (!(boostLeft[b.key] > 0)) { SFX.lock(); return showToast('Get more in the shop (full game)'); }
     if (b.key === 'rewind') {
-      const busy = fly || unfly || flyers.length || S.plates.some(q => q.pop || q.adding) || (S.spider && S.spider.t < 1);
+      const busy = fly || unfly || flyers.length || S.plates.some(q => q.pop || q.adding) || S.plates.some(q => q.spT < 1);
       if (busy) return;                                        // wait until the last move has settled
       if (!S.hist || !S.hist.length) { SFX.nope(); return showToast('Nothing to rewind yet'); }
       rewind(); boostLeft.rewind--; refreshSpin = 1; armed = null;
@@ -1182,13 +1187,13 @@
     else if (p.ice) breakIce(p);
     else {
       const fruit = p.fruit, n = reduceMotion ? 6 : 16, fx = FX[fruit];
-      p.slots.forEach((on, j) => { if (!on) return; const a = -Math.PI / 2 + j * SEG + SEG / 2, v = 150 + Math.random() * 80;
+      if (p.spider != null) collectSpider(p);                  // the hammer frees the spider too
+      if (fruit) p.slots.forEach((on, j) => { if (!on) return; const a = -Math.PI / 2 + j * SEG + SEG / 2, v = 150 + Math.random() * 80;
         particles.push({ kind: 'wedge', fruit, i: j, x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 80, life: .55, age: 0 }); });
-      for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 120 + Math.random() * 220, [sheet, list] = fx.small;
+      if (fruit) for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = 120 + Math.random() * 220, [sheet, list] = fx.small;
         particles.push({ kind: 'sprite', sheet, src: list[(Math.random() * list.length) | 0], x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 120, s: .7 + Math.random() * .6, life: .7, age: 0, rot: a, vr: 0 }); }
       p.slots = p.slots.map(() => false); p.fruit = null; SFX.thud();
     }
-    if (spiderOn(p)) S.spider.shake = 1;                    // the spider gets a fright but stays
     p.bounce = 1; particles.push({ kind: 'ring', x: p.x, y: p.y, life: .4, age: 0 });
     for (let j = 0; j < 6; j++) { const a = Math.random() * TAU, v = 60 + Math.random() * 80; sparks.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 6, age: 0, life: .5, rot: a, color: '#FFF4C2' }); }
   }
@@ -1232,7 +1237,7 @@
       star(q.x + Math.cos(a) * r, y + Math.sin(a) * r * .8, 7 * inS * (1 - out), k * 4 + i);
     }
     ctx.save(); ctx.translate(q.x, y); ctx.scale(inS * big, inS * big);
-    outlined('+6', 0, -4, 56, '#FFD23F');
+    outlined('+' + (q.n || 6), 0, -4, 56, '#FFD23F');
     ctx.restore();
     const ws = back(Math.min(1, Math.max(0, k - .08) * 5));
     if (ws > 0) { ctx.save(); ctx.translate(q.x, y + 36); ctx.scale(ws, ws); outlined(q.word, 0, 0, 22, q.combo > 1 ? '#FFD23F' : '#fff'); ctx.restore(); }
@@ -1286,16 +1291,17 @@
       particles.push({ kind: 'sprite', sheet: bs, src: bl[(Math.random() * bl.length) | 0], x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 180,
         s: .6 + Math.random() * .4, life: .9, age: 0, rot: 0, vr: (Math.random() - .5) * 10 });
     }
-    for (let i = 0; i < 6; i++) {
+    const fruitSlots = [0, 1, 2, 3, 4, 5].filter(i => p.slots[i]);       // a spider's spot is not a slice
+    for (const i of fruitSlots) {
       const a = -Math.PI / 2 + i * SEG + SEG / 2, v = 150 + Math.random() * 60;
       particles.push({ kind: 'wedge', fruit, i, x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: .5, age: 0 });
     }
     particles.push({ kind: 'ring', x: p.x, y: p.y, life: .45, age: 0 });
     neighbours(p).filter(q => q.ice).forEach((q, i) => setTimeout(() => breakIce(q), i * 90));
     const combo = S.combo > 1;
-    particles.push({ kind: 'reward', x: p.x, y: p.y - 6, life: 1.15, age: 0, combo: S.combo,
+    particles.push({ kind: 'reward', x: p.x, y: p.y - 6, life: 1.15, age: 0, combo: S.combo, n: fruitSlots.length,
       word: combo ? (S.lives < MAX_LIVES ? `Combo! +1 life` : `Combo x${S.combo}!`) : fx.words[(Math.random() * fx.words.length) | 0] });
-    for (let i = 0; i < 6; i++) flyers.push({ kind: 'slice', fruit, i, x0: p.x, y0: p.y, t: -.12 - i * .05, dur: .42, combo: S.combo });
+    fruitSlots.forEach((i, n) => flyers.push({ kind: 'slice', fruit, i, x0: p.x, y0: p.y, t: -.12 - n * .05, dur: .42, combo: S.combo, last: n === fruitSlots.length - 1 }));
     if (combo && S.livesShown && !S.comboTaught) {             // explain the first combo the player makes
       S.comboTaught = true; teach('combo');
       note = { text: 'Combo! A full plate\nback to back gives you\na life.', age: -.9, hold: true, spot: true };
@@ -1486,7 +1492,7 @@
     } else {
       p.shake = 1; S.combo = 0;
       if (p.only && p.only !== S.piece.fruit) showToast(ONLY[p.only] + ' only!', p.x, p.y);
-      else if (spiderOn(p) && [...Array(S.piece.size)].some((_, k) => spiderAt(p, (S.piece.start + k) % 6))) { S.spider.shake = 1; showToast('The spider is in the way!', p.x, p.y); }
+      else if (p.spider != null && [...Array(S.piece.size)].some((_, k) => (S.piece.start + k) % 6 === p.spider)) { p.spAngry = 1; showToast('The spider is in the way!', p.x, p.y); }
       if (!S.livesShown) SFX.nope(); else loseLife();
     }
   });
@@ -1497,7 +1503,7 @@
     p.bounce = 1; S.moves++;
     SFX.place();
     if (filled(p) === 6) { p.pop = .001; S.combo++; } else S.combo = 0;
-    afterMove(p, f.piece);
+    afterMove(p);
     setTimeout(spawnPiece, 120);
   }
   // the board's moving parts react to every placed piece
@@ -1506,21 +1512,22 @@
     for (const sx of [-1, 1]) for (let j = 0; j < 3; j++) particles.push({ kind: 'dust', x: p.x + FRUIT_C[0] + sx * (20 + j * 14), y: p.y + FRUIT_C[1] + SH.R - 6,
       vx: sx * (30 + Math.random() * 40), vy: -10 - Math.random() * 20, life: .5 + Math.random() * .2, age: 0, drag: true, r: 4 + Math.random() * 3 });
   }
-  function afterMove(used, pc) {
-    if (S.spider) spiderFollow(used, pc);                   // the spider jumps onto the plate you just used
+  function afterMove(used) {
     let spun = false, lids = 0;
     for (const q of S.plates) {
       if (q.spin && !q.pop) { q.slots = q.slots.map((_, i) => q.slots[(i + 5) % 6]); q.turns++; q.spinA = 1; q.spinDir = 1; spun = true;
-        if (spiderOn(q)) S.spider.slot = (S.spider.slot + 1) % 6; }
+        if (q.spider != null) { q.spider = (q.spider + 1) % 6; if (q.spFrom != null) q.spFrom = (q.spFrom + 1) % 6; } }
       if (q.lid) { q.lidOpen = !q.lidOpen; q.shT = 0; if (q.lidOpen) lids++; }
     }
     if (spun) SFX.spin();
     if (lids) SFX.rollUp();
+    spidersHop(used);
   }
   function spawnPiece() {
     if (scene !== 'game' || S.phase !== 'play' || S.piece || fly || unfly) return;
-    const pending = f => flyers.filter(q => q.kind === 'slice' && q.fruit === f).length + S.plates.filter(q => q.pop && q.fruit === f).length * 6;
-    if (fruitsOf(cfg()).every(f => S.left[f] - pending(f) <= 0)) return;   // stage is finishing
+    const pending = f => f === 'x' ? flyers.filter(q => q.kind === 'spider').length + S.plates.filter(q => q.pop && q.spider != null).length
+      : flyers.filter(q => q.kind === 'slice' && q.fruit === f).length + S.plates.filter(q => q.pop && q.fruit === f).reduce((a, q) => a + q.slots.filter(Boolean).length, 0);
+    if (goalsOf(cfg()).every(f => S.left[f] - pending(f) <= 0)) return;   // stage is finishing
     S.piece = newPiece(); S.pieceIn = 0; idle = 0; SFX.appear();
     if (!anyFit(S.piece)) endStage('moves');
   }
@@ -1549,8 +1556,6 @@
     if (hammerFx && (hammerFx.t += dt) > .3 && !hammerFx.hit) { hammerFx.hit = true; hammerHit(hammerFx.p); }
     if (hammerFx && hammerFx.t > .8) hammerFx = null;
     if (S.piece) S.pieceIn = Math.min(1, S.pieceIn + dt * 4);
-    if (S.spider) { const s = S.spider, t0 = s.t; s.t = Math.min(1, s.t + dt / .5); s.shake = Math.max(0, s.shake - dt * 3);
-      if (t0 < 1 && s.t >= 1 && S.plates[s.i]) { s.landT = t; S.plates[s.i].bounce = Math.max(S.plates[s.i].bounce, .4); } }
     if (fly && (fly.t += dt / .16) >= 1) { const f = fly; fly = null; land(f); }
     if (unfly && !unfly.lifted && (unfly.lifted = true)) { unfly.p.slots = unfly.slots; unfly.p.fruit = unfly.fruit; }
     if (unfly && (unfly.t += dt / .24) >= 1) { S.piece = unfly.piece; S.pieceIn = .7; unfly = null; SFX.appear(); }
@@ -1563,7 +1568,9 @@
       if (p.lid) { const t0 = p.shT; p.shT += dt;
         if (!p.lidOpen && t0 < SH.drop && p.shT >= SH.drop) shutterSlam(p); }
       p.rattle = Math.max(0, p.rattle - dt * 3); p.iceIn = Math.max(0, (p.iceIn || 0) - dt * 3);
-      if (p.pop > 0) { p.pop += dt * 14; if (p.pop >= 1) { p.pop = 0; explode(p, p.fruit); p.slots = p.slots.map(() => false); p.fruit = null; } }
+      if (p.spT < 1) { const u0 = p.spT; p.spT = Math.min(1, p.spT + dt / HOP); if (u0 < 1 && p.spT >= 1) { p.spLand = t; p.spFrom = null; p.spBack = false; SFX.tap(); } }
+      p.spStartle = Math.max(0, p.spStartle - dt * 4); p.spAngry = Math.max(0, p.spAngry - dt * 2);
+      if (p.pop > 0) { p.pop += dt * 14; if (p.pop >= 1) { p.pop = 0; if (p.spider != null) collectSpider(p); explode(p, p.fruit); p.slots = p.slots.map(() => false); p.fruit = null; } }
     }
     for (const q of particles) {
       q.age += dt;
@@ -1586,11 +1593,17 @@
           sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 5 + Math.random() * 3, age: 0, life: .5 + Math.random() * .3, rot: Math.random() * 3, color: '#FF8A8A' }); }
         continue;
       }
+      if (f.kind === 'spider') {
+        S.left.x = Math.max(0, S.left.x - 1); hudBump.x = 1; hudFlash = 1; SFX.spiderGet();
+        for (let j = 0; j < 7; j++) { const a = Math.random() * TAU, v = 70 + Math.random() * 110;
+          sparks.push({ x: goalX('x'), y: GOAL_ICON_Y + 4, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 5 + Math.random() * 4, age: 0, life: .5 + Math.random() * .3, rot: Math.random() * 3, color: j % 2 ? '#C9B4FF' : '#FFE45C' }); }
+        continue;
+      }
       S.left[f.fruit] = Math.max(0, S.left[f.fruit] - 1); hudBump[f.fruit] = 1; hudFlash = 1;
       SFX.tick(f.i, Math.min(f.combo - 1, 3));
       for (let j = 0; j < 3; j++) { const a = Math.random() * TAU, v = 60 + Math.random() * 90;
         sparks.push({ x: goalX(f.fruit), y: GOAL_ICON_Y + 8, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 5 + Math.random() * 4, age: 0, life: .5 + Math.random() * .3, rot: Math.random() * 3 }); }
-      if (f.i === 5) SFX.reward(f.combo);
+      if (f.last) SFX.reward(f.combo);
     }
     flyers = flyers.filter(f => !f.done);
 
@@ -1612,7 +1625,7 @@
       const k = S.autoEnd; S.autoEnd = null; S.piece = null;
       if (k === 'win') { S.phase = 'clear'; S.phaseT = 0; S.forceWin = true; } else endStage('moves');
     } else if (S.phase === 'play') {
-      if (fruitsOf(st).every(f => S.left[f] === 0) && !flyers.length && !fly && !S.plates.some(p => p.pop) && !note) {
+      if (goalsOf(st).every(f => S.left[f] === 0) && !flyers.length && !fly && !S.plates.some(p => p.pop) && !note) {
         S.phase = 'clear'; S.phaseT = 0; S.piece = null; if (!endsHere()) SFX.banner();
       }
     } else if (S.phase === 'clear') {
@@ -1979,7 +1992,6 @@
       drawPiece(S.piece, 0, 0);
       ctx.restore();
     }
-    drawSpider();
 
     for (const q of particles) {
       const k = q.age / q.life;
@@ -2003,6 +2015,19 @@
     }
 
     for (const f of flyers) {
+      if (f.kind === 'spider') {
+        const [tx, ty] = [goalX('x'), GOAL_ICON_Y + 1];
+        if (f.t < 0) {                                        // happy hop and a spin where it sat
+          const u = (f.t + .55) / .55, h = Math.abs(Math.sin(u * Math.PI * 2)) * 16;
+          ctx.save(); ctx.translate(f.x0, f.y0 - h); ctx.rotate(u > .5 ? (u - .5) * 2 * TAU : 0); drawSpiderAt(0, 0, SPIDER_S * (1 + u * .15), { happy: true, tuck: h / 16 * .5 }); ctx.restore();
+          if (Math.random() < .3) sparks.push({ x: f.x0 + (Math.random() - .5) * 30, y: f.y0 - 10, vx: (Math.random() - .5) * 60, vy: -60, r: 4, age: 0, life: .4, rot: 0, color: '#FFE45C' });
+          continue;
+        }
+        const k = ease(f.t), sx = f.x0 + (tx - f.x0) * k, sy = f.y0 + (ty - f.y0) * k - Math.sin(k * Math.PI) * 30, sway = Math.sin(f.t * 14) * .35 * (1 - k);
+        ctx.beginPath(); ctx.moveTo(tx, ty - 6); ctx.lineTo(sx, sy - 6); ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke();   // its silk thread
+        ctx.save(); ctx.translate(sx, sy); ctx.rotate(sway); drawSpiderAt(0, 0, SPIDER_S * (1.15 - k * .22), { happy: true, tuck: .3 }); ctx.restore();
+        continue;
+      }
       if (f.t < 0) continue;
       const k = ease(f.t);
       const [tx, ty] = f.kind === 'heart' ? heartPos(f.slot) : [goalX(f.fruit), GOAL_ICON_Y];
@@ -2151,7 +2176,7 @@
   function openDrive() { if (TEST.autoBus && scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.busGo(); } }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(openDrive, 600); });
   addEventListener('pageshow', e => { if (e.persisted) setTimeout(openDrive, 600); });
-  function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { spider: null, stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
+  function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
   window.claude?.hot?.snapshot?.(() => ({ S, scene }));
 
   resize();
