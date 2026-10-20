@@ -318,19 +318,24 @@
     }
     const fr = fruitsOf(st).filter(f => S.left[f] > 0);
     const pool = fr.length ? fr : fruitsOf(st);
-    const fruit = pool[(Math.random() * pool.length) | 0];
+    let fruit = pool[(Math.random() * pool.length) | 0];
     if (Math.random() < st.pFit) {
-      const opts = [];
-      for (let size = 1; size <= 3; size++) for (let start = 0; start < 6; start++) {
-        const pc = { fruit, start, size };
-        let w = 0;
-        for (const p of S.plates) {
-          if (!fits(p, pc)) continue;
-          const n = filled(p);
-          w = Math.max(w, n + size === 6 ? 10 : n > 0 ? 2 : 1);
+      const optsFor = f => {
+        const out = [];
+        for (let size = 1; size <= 3; size++) for (let start = 0; start < 6; start++) {
+          const pc = { fruit: f, start, size };
+          let w = 0;
+          for (const p of S.plates) {
+            if (!fits(p, pc)) continue;
+            const n = filled(p);
+            w = Math.max(w, n + size === 6 ? 10 : n > 0 ? 2 : 1);
+          }
+          if (w) out.push({ pc, w });
         }
-        if (w) opts.push({ pc, w });
-      }
+        return out;
+      };
+      let opts = optsFor(fruit);
+      for (const f of [...pool, ...fruitsOf(st)]) { if (opts.length) break; opts = optsFor(f); fruit = f; }   // that fruit has nowhere to go: try the others
       if (opts.length) {
         let r = Math.random() * opts.reduce((a, o) => a + o.w, 0);
         for (const o of opts) if ((r -= o.w) <= 0) return o.pc;
@@ -671,7 +676,7 @@
     if (n) SFX.cheer();
   }
   // ---------- chained plates: a steel chain from rim to rim; a full plate pulls it tight while it waits ----------
-  const CHAIN_SNAP = .32, CHAIN_IN = 44, LINK = 1.3;                                    // strain time before it snaps, anchor distance from a plate's middle
+  const CHAIN_SNAP = .1, CHAIN_IN = 44, LINK = 1.3;                                    // strain time before it snaps, anchor distance from a plate's middle
   // links between two anchor points, sagging when slack; tense 0..1 pulls it straight and shakes it, glow tints it gold..white
   function chainLinks(ax, ay, bx, by, tense) {
     const len = Math.hypot(bx - ax, by - ay), n = Math.max(4, Math.round(len / (9.5 * LINK))), sag = 9 * (1 - tense);
@@ -683,26 +688,42 @@
     }
     return out;
   }
-  function drawLink(x, y, a, edge, glow = 0, s = 1) {
-    ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.scale(s, s); ctx.lineCap = 'round';
-    const metal = glow > .5 ? '#FFF6D0' : glow > 0 ? '#F4E3A0' : '#C9D2E0';
-    if (edge) {                                                           // seen side on: a short bar
-      ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.lineWidth = 5; ctx.strokeStyle = '#3B4252'; ctx.stroke();
-      ctx.lineWidth = 3; ctx.strokeStyle = metal; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-4.5, -.7); ctx.lineTo(4.5, -.7); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke();
-    } else {                                                              // seen face on: a ring
-      ctx.beginPath(); ctx.ellipse(0, 0, 6.6, 4.4, 0, 0, TAU); ctx.lineWidth = 4.6; ctx.strokeStyle = '#3B4252'; ctx.stroke();
-      ctx.lineWidth = 2.6; ctx.strokeStyle = metal; ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(0, 0, 6.6, 4.4, 0, Math.PI * 1.1, Math.PI * 1.75); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke();
+  // a steel link, lit from the top left; shadow draws just its silhouette for the shadow it casts
+  function drawLink(x, y, a, edge, glow = 0, s = 1, shadow = false) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.scale(s, s); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (shadow) {
+      ctx.fillStyle = ctx.strokeStyle = 'rgba(20,30,50,.28)';
+      if (edge) { ctx.beginPath(); ctx.roundRect(-7.6, -3.1, 15.2, 6.2, 3.1); ctx.fill(); }
+      else { ctx.beginPath(); ctx.ellipse(0, 0, 6.8, 4.6, 0, 0, TAU); ctx.lineWidth = 4.4; ctx.stroke(); }
+      ctx.restore(); return;
+    }
+    const m = glow ? ['#FFFDF2', '#FFF0B8', '#E9B949', '#9C6B18'] : ['#FFFFFF', '#E3E9F2', '#98A3B5', '#566072'];
+    if (edge) {                                                           // seen side on: a rounded bar, the far side of the ring in shade
+      ctx.beginPath(); ctx.roundRect(-7.6, -3.1, 15.2, 6.2, 3.1); ctx.fillStyle = '#283040'; ctx.fill();
+      const g = ctx.createLinearGradient(0, -2.4, 0, 2.4); g.addColorStop(0, m[0]); g.addColorStop(.3, m[1]); g.addColorStop(.7, m[2]); g.addColorStop(1, m[3]);
+      ctx.beginPath(); ctx.roundRect(-6.8, -2.3, 13.6, 4.6, 2.3); ctx.fillStyle = g; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-4.6, -1.25); ctx.lineTo(3.6, -1.25); ctx.lineWidth = .9; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-4.2, 1); ctx.lineTo(4.2, 1); ctx.lineWidth = .7; ctx.strokeStyle = 'rgba(30,38,52,.35)'; ctx.stroke();
+    } else {                                                              // seen face on: a ring with depth
+      ctx.beginPath(); ctx.ellipse(0, 0, 6.8, 4.6, 0, 0, TAU); ctx.lineWidth = 5; ctx.strokeStyle = '#283040'; ctx.stroke();
+      const g = ctx.createLinearGradient(-5, -5, 5, 5); g.addColorStop(0, m[0]); g.addColorStop(.3, m[1]); g.addColorStop(.68, m[2]); g.addColorStop(1, m[3]);
+      ctx.lineWidth = 3.1; ctx.strokeStyle = g; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, 0, 5.45, 3.35, 0, Math.PI * 1.05, Math.PI * 1.95); ctx.lineWidth = .9; ctx.strokeStyle = 'rgba(30,38,52,.5)'; ctx.stroke();      // inside of the hole, in shade
+      ctx.beginPath(); ctx.ellipse(0, 0, 7.35, 5.1, 0, Math.PI * 1.12, Math.PI * 1.62); ctx.lineWidth = 1.1; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke();  // shine
+      ctx.beginPath(); ctx.ellipse(0, 0, 6.9, 4.7, 0, Math.PI * .15, Math.PI * .55); ctx.lineWidth = .8; ctx.strokeStyle = 'rgba(200,215,240,.55)'; ctx.stroke();   // bounce light underneath
+      ctx.beginPath(); ctx.arc(-3.7, -3.5, .95, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
     }
     ctx.restore();
   }
-  function drawBolt(x, y, s = 1) {                                        // where the chain is fixed to a plate's rim
+  function drawBolt(x, y, s = 1) {                                        // where the chain is fixed to a plate's rim: a washer and a domed bolt
     ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
-    ctx.fillStyle = 'rgba(20,30,60,.3)'; ctx.beginPath(); ctx.arc(.8, 1.8, 6.2, 0, TAU); ctx.fill();
-    const g = ctx.createRadialGradient(-2, -2, .5, 0, 0, 6.5); g.addColorStop(0, '#FFFFFF'); g.addColorStop(.45, '#C9D2E0'); g.addColorStop(1, '#6B7488');
-    ctx.beginPath(); ctx.arc(0, 0, 6, 0, TAU); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#3B4252'; ctx.stroke();
-    ctx.beginPath(); ctx.arc(0, 0, 2.2, 0, TAU); ctx.fillStyle = '#4A5264'; ctx.fill();
+    ctx.fillStyle = 'rgba(20,30,50,.3)'; ctx.beginPath(); ctx.ellipse(1.6, 3, 7.6, 7, 0, 0, TAU); ctx.fill();
+    const w = ctx.createLinearGradient(-6, -6, 6, 6); w.addColorStop(0, '#F2F5FA'); w.addColorStop(.5, '#AEB8C8'); w.addColorStop(1, '#5E687B');
+    ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fillStyle = w; ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = '#283040'; ctx.stroke();
+    const d = ctx.createRadialGradient(-1.7, -1.9, .3, 0, 0, 4.8); d.addColorStop(0, '#FFFFFF'); d.addColorStop(.4, '#CDD5E1'); d.addColorStop(1, '#5E687B');
+    ctx.beginPath(); ctx.arc(.3, .4, 4.4, 0, TAU); ctx.fillStyle = 'rgba(20,30,50,.35)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 4.4, 0, TAU); ctx.fillStyle = d; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = '#3A4252'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(-1.6, -1.7, 1.1, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
     ctx.restore();
   }
   // one chain from plate centre a to plate centre b (s scales it for the intro)
@@ -714,8 +735,10 @@
     for (const [w, x, y] of [[waitA, ax, ay], [waitB, bx, by]]) if (w) {      // a plate that waits glows softly
       ctx.beginPath(); ctx.arc(x, y, (PLATE_R + 3) * s, 0, TAU); ctx.lineWidth = 5 * s; ctx.strokeStyle = `rgba(255,214,90,${.45 + Math.sin(t * 6) * .25})`; ctx.stroke();
     }
+    const links = chainLinks(px, py, qx, qy, tense);
+    for (const [x, y, a, edge] of links) drawLink(x - uy * jit + 2.5 * s, y + ux * jit + 4.5 * s, a, edge, 0, s * LINK, true);   // the shadow it casts
     if (glow) { ctx.shadowColor = `rgba(255,236,150,${glow})`; ctx.shadowBlur = 14 * glow; }
-    for (const [x, y, a, edge] of chainLinks(px, py, qx, qy, tense)) drawLink(x - uy * jit, y + ux * jit, a, edge, glow, s * LINK);
+    for (const edge of [0, 1]) for (const [x, y, a, e] of links) if (e === edge) drawLink(x - uy * jit, y + ux * jit, a, e, glow, s * LINK);   // rings first, bars over them, so they interlock
     ctx.shadowBlur = 0;
     drawBolt(px, py, s * 1.15); drawBolt(qx, qy, s * 1.15);
     drawPadlock((px + qx) / 2 - uy * jit, (py + qy) / 2 + 9 * (1 - tense) * .5 + ux * jit + 6 * s, s, glow, open);
@@ -723,16 +746,29 @@
   }
   // a gold padlock hanging from the middle of the chain; open 0..1 swings its shackle up
   function drawPadlock(x, y, s = 1, glow = 0, open = 0) {
-    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(Math.sin(t * 2.2) * .08 * (1 - glow));
-    ctx.save(); ctx.translate(5, -6); ctx.rotate(-open * 1.1); ctx.translate(-5, 6);                       // shackle
-    ctx.beginPath(); ctx.moveTo(-5, -5); ctx.lineTo(-5, -9); ctx.arc(0, -9, 5, Math.PI, 0); ctx.lineTo(5, -5 - open * 4);
-    ctx.lineCap = 'round'; ctx.lineWidth = 5; ctx.strokeStyle = '#3B4252'; ctx.stroke(); ctx.lineWidth = 2.8; ctx.strokeStyle = '#D5DCE8'; ctx.stroke();
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(Math.sin(t * 2.2) * .08 * (1 - glow)); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // shackle: a steel tube
+    ctx.save(); ctx.translate(5, -6); ctx.rotate(-open * 1.1); ctx.translate(-5, 6);
+    const shackle = () => { ctx.beginPath(); ctx.moveTo(-5.2, -4); ctx.lineTo(-5.2, -9); ctx.arc(0, -9, 5.2, Math.PI, 0); ctx.lineTo(5.2, -4 - open * 4); };
+    shackle(); ctx.lineWidth = 5.8; ctx.strokeStyle = '#283040'; ctx.stroke();
+    const sg = ctx.createLinearGradient(-7, -14, 7, -2); sg.addColorStop(0, '#FFFFFF'); sg.addColorStop(.35, '#D9E0EA'); sg.addColorStop(.75, '#8A95A8'); sg.addColorStop(1, '#566072');
+    shackle(); ctx.lineWidth = 3.6; ctx.strokeStyle = sg; ctx.stroke();
+    ctx.save(); ctx.translate(-.8, -.7); shackle(); ctx.restore(); ctx.lineWidth = .9; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
     ctx.restore();
-    ctx.fillStyle = 'rgba(40,20,0,.3)'; ctx.beginPath(); ctx.roundRect(-8, -4, 17.5, 15, 4); ctx.fill();         // body
-    const g = ctx.createLinearGradient(0, -6, 0, 10); g.addColorStop(0, glow > .5 ? '#FFFBE0' : '#FFE68A'); g.addColorStop(.55, '#FFC02E'); g.addColorStop(1, '#E08A0A');
-    ctx.beginPath(); ctx.roundRect(-8.5, -5.5, 17, 14.5, 4); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#8A4E06'; ctx.stroke();
-    ctx.beginPath(); ctx.roundRect(-6.5, -4.2, 13, 3, 1.5); ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, 1.6, 2, 0, TAU); ctx.moveTo(-1, 2.5); ctx.lineTo(1, 2.5); ctx.lineTo(.6, 6); ctx.lineTo(-.6, 6); ctx.closePath(); ctx.fillStyle = '#6A3A04'; ctx.fill();   // keyhole
+    // body: a chunky gold block with bevelled edges
+    ctx.save(); ctx.filter = 'none'; ctx.fillStyle = 'rgba(40,20,0,.32)'; ctx.beginPath(); ctx.roundRect(-7.5, -3, 18.5, 15.5, 5); ctx.fill(); ctx.restore();
+    const g = ctx.createLinearGradient(0, -6, 0, 10);
+    g.addColorStop(0, glow > .5 ? '#FFFFF0' : '#FFF2B8'); g.addColorStop(.3, '#FFD45A'); g.addColorStop(.72, '#F5A91E'); g.addColorStop(1, '#B8700A');
+    ctx.beginPath(); ctx.roundRect(-9, -5.8, 18, 15.2, 4.8); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#7A4306'; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.roundRect(-9, -5.8, 18, 15.2, 4.8); ctx.clip();
+    ctx.beginPath(); ctx.roundRect(-7.6, -4.4, 15.2, 12.4, 3.6); ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(255,250,220,.75)'; ctx.stroke();      // bevel catching the light
+    ctx.beginPath(); ctx.moveTo(-8, 8.6); ctx.lineTo(8, 8.6); ctx.lineWidth = 2.2; ctx.strokeStyle = 'rgba(120,60,0,.45)'; ctx.stroke();            // underside in shade
+    ctx.beginPath(); ctx.ellipse(-3.2, -2.6, 4.6, 1.7, -.15, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fill();                       // shine
+    ctx.restore();
+    // keyhole, sunk into the metal
+    const kh = () => { ctx.beginPath(); ctx.arc(0, 1.4, 2.1, 0, TAU); ctx.moveTo(-1.1, 2.4); ctx.lineTo(1.1, 2.4); ctx.lineTo(.7, 6.2); ctx.lineTo(-.7, 6.2); ctx.closePath(); };
+    ctx.save(); ctx.translate(0, .6); kh(); ctx.fillStyle = 'rgba(255,240,190,.7)'; ctx.fill(); ctx.restore();
+    kh(); ctx.fillStyle = '#3A1E02'; ctx.fill();
     ctx.restore();
   }
   function drawChains() {
@@ -929,12 +965,12 @@
         drawSpiderAt(0, 0, .5, { tuck: Math.sin(k * Math.PI), blink: blinkAt(3), look: [i ? -1 : 1, .2], scared: u > .18 && u < 1 }); ctx.restore(); } },
     chain: { title: 'Chained Plates', word: 'CHAINED', lines: ['CHAINED plates are only', 'served together!'],
       demo() {                                                // left plate is full and waits; the right one fills; the chain strains and snaps
-        const c = t % 3.2, PS = .6, P = [-64, 64], right = c < 1.1 ? [1, 1, 1, 1, 0, 0] : [1, 1, 1, 1, 1, 1], gone = c > 1.5 && c < 2.4;
-        const pop = c > 1.5 && c < 1.7 ? Math.sin((c - 1.5) / .2 * Math.PI) * .12 : 0;
+        const c = t % 3.2, PS = .6, P = [-64, 64], right = c < 1.1 ? [1, 1, 1, 1, 0, 0] : [1, 1, 1, 1, 1, 1], gone = c > 1.2 && c < 2.4;
+        const pop = c > 1.2 && c < 1.4 ? Math.sin((c - 1.2) / .2 * Math.PI) * .12 : 0;
         P.forEach((px, i) => { ctx.save(); ctx.translate(px, 0); ctx.scale(PS * (1 + pop), PS * (1 + pop)); ctx.drawImage(A.plate, -MC[0], -MC[1]);
           if (!gone) (i ? right : [1, 1, 1, 1, 1, 1]).forEach((on, j) => { if (on) drawSlice(0, 0, i ? 'l' : 'm', j); }); ctx.restore(); });
-        if (c < 1.5) { const u = c > 1.1 ? (c - 1.1) / .4 : 0; drawChainBetween(-64, 0, 64, 0, c > 1.1 ? 1 : .85, c > 1.1 ? .4 + u * .6 : 0, 1, PS, c <= 1.1, 0, c > 1.1 ? easeIn(u) : 0); }
-        else if (c < 2.1) { const u = (c - 1.5) / .6;                         // links flying off
+        if (c < 1.2) { const u = c > 1.1 ? (c - 1.1) / .1 : 0; drawChainBetween(-64, 0, 64, 0, c > 1.1 ? 1 : .85, c > 1.1 ? .4 + u * .6 : 0, 1, PS, c <= 1.1, 0, c > 1.1 ? easeIn(u) : 0); }
+        else if (c < 1.8) { const u = (c - 1.2) / .6;                         // links flying off
           chainLinks(-64 + CHAIN_IN * PS, 0, 64 - CHAIN_IN * PS, 0, 1).forEach(([x, y, a, edge], i) => { const b = (i - 2) * .5 - Math.PI / 2;
             ctx.save(); ctx.globalAlpha = 1 - u; drawLink(x + Math.cos(b) * 70 * u, y + Math.sin(b) * 70 * u + 120 * u * u, a + u * 8 * (i % 2 ? 1 : -1), edge, 0, PS * LINK); ctx.restore(); });
           ctx.save(); ctx.globalAlpha = 1 - u; ctx.translate(0, 4 - 90 * u + 160 * u * u); ctx.rotate(u * 5); drawPadlock(0, 0, PS * 1.1, 0, 1); ctx.restore(); }
