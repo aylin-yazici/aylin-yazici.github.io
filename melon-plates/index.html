@@ -583,7 +583,7 @@
     else { ctx.fillStyle = '#F4F0FF'; for (const fx of [-2.3, 2.3]) { ctx.beginPath(); ctx.moveTo(fx - 1.3, 8.4); ctx.lineTo(fx + 1.3, 8.4); ctx.lineTo(fx, 11.2); ctx.closePath(); ctx.fill(); } }
     ctx.restore();
   }
-  const SPIDER_S = .6, SPIDER_R = 35, HOP = .5, SPIDER_AWAY = .45;           // size (fits one spot), distance from the middle, hop time, chance to leave its plate
+  const SPIDER_S = .6, SPIDER_R = 35, HOP = .5;                               // size (fits one spot), distance from the middle, hop time
   const spotXY = (slot, r = SPIDER_R) => { const a = -Math.PI / 2 + (slot + .5) * SEG; return [FRUIT_C[0] + Math.cos(a) * r, FRUIT_C[1] + Math.sin(a) * r]; };
   // where a spot is on screen, following the plate as it slides in and out and turns
   function spotWorld(q, slot) {
@@ -622,8 +622,8 @@
     return pool.length ? pool[(Math.random() * pool.length) | 0] : -1;
   }
   const spiderCanLand = q => q && !q.pop && !q.adding && !q.ice && !(q.lid && !q.lidOpen);
-  // after every move: each spider counts down its own random 1-3 moves, then hops to another spot on its plate or onto a neighbour,
-  // each after its own short delay so they never move together
+  // after every move: each spider counts down its own random 1-3 moves, then hops onto a neighbouring plate
+  // (it stays put if none can take it), each after its own short delay so they never move together
   function spidersHop(used) {
     for (const s of S.spiders) {
       const home = S.plates[s.p];
@@ -635,8 +635,7 @@
       if (s.to) { q = S.plates[s.to[0]]; j = s.to[1]; s.to = null; }
       else {
         const away = neighbours(home).filter(spiderCanLand);
-        if (away.length && Math.random() < SPIDER_AWAY) { q = away[(Math.random() * away.length) | 0]; j = spotFor(q, s); }
-        if (j < 0) { q = home; j = spotFor(home, s); }
+        if (away.length) { q = away[(Math.random() * away.length) | 0]; j = spotFor(q, s); }
       }
       if (!q || j < 0) continue;
       s.from = [s.p, s.slot]; s.p = S.plates.indexOf(q); s.slot = j; s.t = -Math.random() * .4;
@@ -811,12 +810,16 @@
       demo() { const c = t % 2.8, open = c >= 1.4, k = shutterK(open, open ? c - 1.4 : c);
         ctx.drawImage(A.plate, -MC[0], -MC[1]); [1, 1, 1, 1, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawShutter(k); } },
     spider: { title: 'Spider', word: 'SPIDER', lines: ['Serve the plate a SPIDER', 'is on before it hops away!'],
-      demo() { ctx.drawImage(A.plate, -MC[0], -MC[1]); [1, 1, 1, 1, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); });
-        const seq = [0, 3, 1, 5, 2], c = t / 1.25, i = Math.floor(c) % 5, u = clamp01((c % 1) * 1.25 / HOP);      // hops from slice to slice
-        const [ax, ay] = spotXY(seq[i]), [bx, by] = spotXY(seq[(i + 1) % 5]), k = easeIO(clamp01((u - .18) / .82)), lift = Math.sin(k * Math.PI) * 26;
-        const x = ax + (bx - ax) * k, y = ay + (by - ay) * k;
-        ctx.save(); ctx.globalAlpha = .26 * (1 - lift / 70); ctx.fillStyle = '#2A1A40'; ctx.beginPath(); ctx.ellipse(x, y + 10, 12, 3.6, 0, 0, TAU); ctx.fill(); ctx.restore();
-        drawSpiderAt(x, y - lift, SPIDER_S * 1.15, { tuck: Math.sin(k * Math.PI), blink: blinkAt(3), look: [Math.sin(t * .8), .3], scared: u > .18 && u < 1 }); } },
+      demo() {                                                // two plates; the spider jumps from one to the other and back
+        const P = [[-64, [1, 1, 1, 0, 0, 1]], [64, [1, 0, 0, 1, 1, 1]]], PS = .6;
+        for (const [px, sl] of P) { ctx.save(); ctx.translate(px, 0); ctx.scale(PS, PS); ctx.drawImage(A.plate, -MC[0], -MC[1]); sl.forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); ctx.restore(); }
+        const c = t / 1.5, i = Math.floor(c) % 2, u = clamp01((c % 1) * 1.5 / .6), k = easeIO(clamp01((u - .18) / .82)), lift = Math.sin(k * Math.PI) * 40;
+        const at = (px, slot) => { const [sx, sy] = spotXY(slot); return [px + sx * PS, sy * PS]; };
+        const [ax, ay] = i ? at(64, 4) : at(-64, 1), [bx, by] = i ? at(-64, 1) : at(64, 4), x = ax + (bx - ax) * k, y = ay + (by - ay) * k;
+        if (u > .18 && u < 1) { ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(x, y - lift); ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke(); }
+        ctx.save(); ctx.globalAlpha = .26 * (1 - lift / 60); ctx.fillStyle = '#2A1A40'; ctx.beginPath(); ctx.ellipse(x, y + 8, 10, 3, 0, 0, TAU); ctx.fill(); ctx.restore();
+        ctx.save(); ctx.translate(x, y - lift); ctx.rotate(k * TAU * (i ? -1 : 1));
+        drawSpiderAt(0, 0, .5, { tuck: Math.sin(k * Math.PI), blink: blinkAt(3), look: [i ? -1 : 1, .2], scared: u > .18 && u < 1 }); ctx.restore(); } },
     only: { title: 'Fruit Plate', word: 'FRUIT PLATE', lines: ['A FRUIT PLATE only takes', 'the fruit printed on it!'],
       demo() { ctx.drawImage(A.plate, -MC[0], -MC[1]); drawOnly('l'); [1, 1, 0, 0, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'l', j); }); } },
   };
