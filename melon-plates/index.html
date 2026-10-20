@@ -45,6 +45,29 @@
   #primary:active{transform:translateY(3px);box-shadow:0 3px 0 #22912B}
   #secondary{display:block;margin:12px auto 0;font-family:inherit;font-size:18px;color:var(--blue);background:none;border:0;cursor:pointer;padding:6px 12px}
   #primary:focus-visible,#secondary:focus-visible{outline:4px solid var(--blue);outline-offset:3px}
+  #testBtn{position:absolute;right:6px;bottom:6px;z-index:5;font:900 12px/1 "Goldplay",system-ui,sans-serif;letter-spacing:.5px;color:#fff;
+    background:rgba(12,45,120,.6);border:2px solid rgba(255,255,255,.75);border-radius:12px;padding:5px 9px;cursor:pointer}
+  #testPanel{position:absolute;inset:0;z-index:6;background:rgba(5,20,60,.55);display:grid;place-items:center;padding:12px}
+  #testPanel[hidden]{display:none}
+  #testPanel .tcard{background:var(--cream);border:5px solid var(--blue);border-radius:22px;width:min(370px,100%);max-height:100%;overflow:auto;
+    padding:10px 14px 14px;box-shadow:0 8px 0 var(--blue-deep);box-sizing:border-box}
+  #testPanel .thead{display:flex;align-items:center;justify-content:space-between;position:sticky;top:-10px;background:var(--cream);padding:4px 0}
+  #testPanel h3{margin:0;font-size:22px;color:var(--blue)}
+  #testClose{font:900 18px "Goldplay",system-ui,sans-serif;color:#fff;background:#E5484D;border:0;border-radius:12px;width:34px;height:34px;box-shadow:0 3px 0 #A3262B;cursor:pointer}
+  #testPanel h4{margin:12px 0 6px;font-size:14px;color:var(--blue-deep)}
+  #testPanel .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px}
+  #testPanel .tgrid button,#testPanel .trow button{font:900 13px/1.15 "Goldplay",system-ui,sans-serif;color:#fff;background:#43C94B;border:0;border-radius:12px;
+    padding:9px 6px;box-shadow:0 3px 0 #22912B;cursor:pointer;text-align:center}
+  #testPanel button.b{background:#2C83F2;box-shadow:0 3px 0 var(--blue-deep)}
+  #testPanel button.o{background:#F7942C;box-shadow:0 3px 0 #B8620D}
+  #testPanel button.r{background:#E5484D;box-shadow:0 3px 0 #A3262B}
+  #testPanel button:active{transform:translateY(2px);box-shadow:none}
+  #testPanel button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+  #testPanel .trow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  #testPanel .trow b{font-size:18px;color:var(--blue);min-width:28px;text-align:center}
+  #testPanel label{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--blue);cursor:pointer}
+  #testPanel input[type=checkbox]{width:20px;height:20px;accent-color:#43C94B}
+  #testPanel p{margin:6px 0 0;font-size:12px;color:var(--blue-deep);opacity:.8}
   @keyframes rise{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
   @media (prefers-reduced-motion: reduce){#end .card{animation:none}}
 </style>
@@ -62,6 +85,13 @@
         <p id="endText"></p>
         <button id="primary" type="button">Continue</button>
         <button id="secondary" type="button">Home</button>
+      </div>
+    </div>
+    <button id="testBtn" type="button" aria-haspopup="dialog">TEST</button>
+    <div id="testPanel" hidden>
+      <div class="tcard" role="dialog" aria-labelledby="testTitle">
+        <div class="thead"><h3 id="testTitle">Test menu</h3><button id="testClose" type="button" aria-label="Close test menu">&#x2715;</button></div>
+        <div id="testBody"></div>
       </div>
     </div>
   </div>
@@ -111,7 +141,7 @@
       script: [{ fruit:'l', start:4, size:2, hint:1 },
                { fruit:'m', start:3, size:3, hint:0 }, { fruit:'l', start:5, size:3, hint:2 }] },
     // ice: frozen plates take no slices until a plate next to them is served (third value 'ice' in pre)
-    { n: 4, goals: { m: 12, l: 6 }, hintDelay: 1.5, pFit: 1, iceIntro: true, intro: '',
+    { n: 4, goals: { m: 12, l: 6 }, hintDelay: 1.5, pFit: 1, obstIntro: 'ice', intro: '',
       pre: [['m',[1,1,1,1,0,0]], ['m',[0,0,1,1,1,0]], ['l',[1,1,1,0,1,1],'ice'], [null,E]],
       script: [{ fruit:'m', start:4, size:2, hint:0, tip: 'Serve the plate next to the ice to break it!' },
                { fruit:'l', start:3, size:1, hint:2, tip: 'The ice is gone! Now this plate can be used' },
@@ -124,10 +154,40 @@
       pre: [['l',[1,1,1,0,0,0]], ['k',[1,1,1,1,0,0]], ['k',[0,0,1,1,1,0]], [null,E]],
       script: [{ fruit:'k', start:4, size:2, hint:1 },
                { fruit:'l', start:3, size:3, hint:0 }, { fruit:'k', start:5, size:3, hint:2 }] },
-    { n: 6, goals: { m: 12, l: 12, k: 12 }, hintDelay: 6, pFit: 1, intro: 'Let\u2019s go!',
+    { n: 6, goals: { m: 12, l: 12, k: 12 }, hintDelay: 6, pFit: 1, intro: 'Let\u2019s go!', menuAfter: true,
       pre: [['k',[1,1,0,0,0,0]], ['m',[0,0,1,1,0,0]], [null,E], ['l',[0,1,1,1,0,0],'ice'], ['k',[0,0,0,1,1,0]], [null,E]],
       script: [] },
+    // spinning plate: turns one slot clockwise after every move (third value 'spin')
+    { n: 4, goals: { m: 12, l: 6 }, hintDelay: 1.5, pFit: 1, obstIntro: 'spin', intro: '',
+      pre: [['l',[1,1,1,1,0,0]], ['m',[0,1,1,1,1,0],'spin'], [null,E], ['m',[1,1,0,0,0,0]]],
+      script: [{ fruit:'l', start:4, size:2, hint:0, tip: 'Serve this plate and\nwatch the spinning one!' },
+               { fruit:'m', start:0, size:2, hint:1, tip: 'It turned! Now the\nslices fit' },
+               { fruit:'m', start:2, size:3, hint:3 }] },
+    { n: 6, goals: { m: 18, l: 12, k: 12 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true,
+      pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,0,1,1,0,0]], [null,E], ['k',[1,0,0,0,1,1],'spin'], ['m',[0,1,1,1,0,0]], [null,E]],
+      script: [] },
+    // cloche lid: opens and closes after every move ('lid' starts closed, 'lidOpen' starts open)
+    { n: 4, goals: { m: 12, l: 6 }, hintDelay: 1.5, pFit: 1, obstIntro: 'lid', intro: '',
+      pre: [['m',[1,1,1,0,0,0],'lid'], ['l',[1,1,1,1,0,0]], [null,E], ['m',[0,0,1,1,1,1]]],
+      script: [{ fruit:'l', start:4, size:2, hint:1, tip: 'The lid opens after\nevery move!' },
+               { fruit:'m', start:3, size:3, hint:0, tip: 'It\u2019s open! Serve it\nbefore it closes' },
+               { fruit:'m', start:0, size:2, hint:3 }] },
+    { n: 6, goals: { m: 18, l: 12, k: 12 }, hintDelay: 6, pFit: .95, intro: 'Let\u2019s go!', menuAfter: true,
+      pre: [['m',[1,1,1,0,0,0],'lid'], ['l',[0,1,1,0,0,0]], ['k',[0,0,1,1,0,0],'spin'], [null,E], ['m',[0,0,0,1,1,1],'lidOpen'], ['k',[1,1,0,0,0,0]]],
+      script: [] },
   ];
+  const STAGE_NAMES = ['Tutorial', 'Lemon', 'Ice intro', 'Ice level', 'Kiwi', 'Three fruits', 'Spin intro', 'Spin level', 'Lid intro', 'Lid level'];
+  // test playgrounds (test menu only): never change the saved level
+  const PLAYGROUNDS = {
+    ice: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Ice playground',
+      pre: [['m',[1,1,0,0,0,0]], ['l',[0,1,1,1,0,0],'ice'], [null,E], ['m',[0,0,1,1,1,0],'ice'], ['l',[1,0,0,0,0,1]], [null,E]], script: [] },
+    spin: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Spin playground',
+      pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,0,0,0]], [null,E,'spin'], ['m',[0,0,1,1,1,0]], ['l',[1,0,0,0,1,1],'spin'], [null,E]], script: [] },
+    lid: { n: 6, goals: { m: 24, l: 24 }, hintDelay: 8, pFit: .95, intro: 'Lid playground',
+      pre: [['m',[1,1,1,0,0,0],'lid'], ['l',[0,1,1,0,0,0]], [null,E,'lidOpen'], ['m',[0,0,1,1,0,0]], ['l',[1,1,0,0,0,1],'lid'], [null,E]], script: [] },
+    all: { n: 6, goals: { m: 18, l: 18, k: 18 }, hintDelay: 8, pFit: .95, intro: 'All obstacles',
+      pre: [['m',[1,1,0,0,0,0],'spin'], ['l',[0,1,1,1,0,0],'ice'], ['k',[1,1,1,0,0,0],'lid'], [null,E], ['m',[0,0,1,1,0,0]], ['k',[0,0,0,0,1,1],'lidOpen']], script: [] },
+  };
 
   const load = src => { const i = new Image(); i.src = src; return i; };
   const A = {};
@@ -166,7 +226,7 @@
       toast = null, note = null, badgeKey = '', badgeFx = 0, gearSpin = 0, lockWiggle = [0,0,0], fade = 0, btnPress = 0, redFlash = 0,
       heartFx = Array(7).fill(0), heartBreak = Array(7).fill(0);
 
-  const cfg = () => STAGES[S.stage];
+  const cfg = () => S.def || STAGES[S.stage];
   const fruitsOf = st => Object.keys(st.goals);
   function makePlates(st) {
     const centres = st.board ? st.board.plates : LAYOUT[st.n].map(pi => POS[pi]);
@@ -175,22 +235,25 @@
       const [fruit, slots, obstacle] = st.pre[i];
       const dx = cx - GEN.x, dy = cy - GEN.y, len = Math.hypot(dx, dy) || 1;
       return { fruit, slots: slots.map(Boolean), x: cx, y: cy, ux: dx / len, uy: dy / len,
-               bounce: 0, pop: 0, shake: 0, enter: 0, exit: 0, delay: i * .07, ice: obstacle === 'ice', iceBreak: 0 };
+               bounce: 0, pop: 0, shake: 0, enter: 0, exit: 0, delay: i * .07, ice: obstacle === 'ice', iceBreak: 0,
+               spin: obstacle === 'spin', spinA: 0, turns: 0, lid: obstacle === 'lid' || obstacle === 'lidOpen', lidOpen: obstacle === 'lidOpen',
+               lidK: obstacle === 'lidOpen' ? 1 : 0, lidOff: 0 };
     });
   }
   function newRun() { return { v: VERSION, stage: 0, lives: START_LIVES, moves: 0, livesShown: false, comboTaught: false, wrongTaught: false }; }
-  function setupStage(i) {
-    const st = STAGES[i];
+  function setupStage(i, def) {
+    S.def = def || null; S.stage = i;
+    const st = cfg();
     if (!st.hideLives && !st.livesIntro) S.livesShown = true;
     Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0,
                        piece: null, pieceIn: 0, phase: 'in', phaseT: 0 });
-    if ((st.iceIntro || S.obstacleTest) && !S.iceShown) { S.phase = 'obstacle'; SFX.obstacle(); }   // the obstacle intro comes before the board
+    if (st.obstIntro && !(S.seen || {})[st.obstIntro]) { S.phase = 'obstacle'; S.introKey = st.obstIntro; SFX.obstacle(); }   // the obstacle intro comes before the board
     fly = null; flyers = []; idle = 0;
     SFX.whoosh(true);
   }
 
   const fits = (p, pc) => {
-    if (p.pop || p.ice || (p.fruit && p.fruit !== pc.fruit)) return false;
+    if (p.pop || p.ice || (p.lid && !p.lidOpen) || (p.fruit && p.fruit !== pc.fruit)) return false;
     for (let k = 0; k < pc.size; k++) if (p.slots[(pc.start + k) % 6]) return false;
     return true;
   };
@@ -361,6 +424,8 @@
     failSoft() { tone({ f0: 392, f1: 370, dur: .2, vol: .09 }); tone({ f0: 294, f1: 262, dur: .38, vol: .09, delay: .17 }); hiss({ dur: .2, vol: .03, type: 'lowpass', f0: 700, delay: .02 }); },   // soft "aww"
     boost() { hiss({ dur: .2, vol: .05, type: 'bandpass', f0: 800, f1: 2400, q: 1 }); bell(PENTA[5], .06, .05); },          // a booster kicks in
     thud() { tone({ f0: 180, f1: 85, dur: .15, vol: .2 }); hiss({ dur: .12, vol: .07, type: 'lowpass', f0: 1200 }); },          // hammer lands
+    spin() { hiss({ dur: .24, vol: .035, type: 'bandpass', f0: 500, f1: 1500, q: 2 }); tone({ f0: 880, dur: .035, vol: .03, type: 'triangle', delay: .18 }); },   // a plate turns
+    lid(open) { bell(open ? PENTA[8] : PENTA[5], .045); hiss({ dur: .07, vol: .025, type: 'highpass', f0: 4200 }); },                                       // cloche: ting up / clink down
     coin() { bell(PENTA[9], .06); tone({ f0: 2093, dur: .07, vol: .025, delay: .05 }); },
     win() { [0, 2, 4, 5, 7].forEach((n, i) => bell(PENTA[n], .1, i * .1)); bell(PENTA[9], .1, .55); bell(PENTA[7], .08, .55); },
   };
@@ -397,12 +462,81 @@
     const s = 1 + p.bounce * .06 + p.pop * .1;
     const dx = p.shake ? Math.sin(p.shake * 40) * 6 * p.shake : 0;
     ctx.save(); ctx.translate(p.x + ox + dx, p.y + oy); ctx.rotate(rot); ctx.scale(s, s);
+    const turn = p.spin ? -SEG * (1 - back(1 - p.spinA)) : 0;           // the last step of the turn, easing in with a little overshoot
+    if (p.spin) drawTurntable(p.turns * SEG + turn);
     ctx.drawImage(A.plate, -MC[0], -MC[1]);
     if (p.shake) { ctx.beginPath(); ctx.arc(0, 0, PLATE_R - 1, 0, TAU); ctx.strokeStyle = `rgba(255,77,77,${p.shake})`; ctx.lineWidth = 5; ctx.stroke(); }
+    if (turn) { ctx.save(); ctx.translate(FRUIT_C[0], FRUIT_C[1]); ctx.rotate(turn); ctx.translate(-FRUIT_C[0], -FRUIT_C[1]); }
     p.slots.forEach((on, j) => { if (on) drawSlice(0, 0, p.fruit, j); });
+    if (turn) ctx.restore();
+    if (p.spin) drawSpinBadge(p.turns * SEG + turn);
     if (p.ice) drawIce(p.slots);
     else if (p.iceBreak > 0) drawIce(p.slots, p.iceBreak, 1 + (1 - p.iceBreak) * .25);
     ctx.restore();
+  }
+  // ---------- spinning plate: a golden turntable under the plate and a turn badge on its rim ----------
+  function drawTurntable(a) {
+    ctx.save(); ctx.translate(FRUIT_C[0], FRUIT_C[1] + 3);
+    ctx.fillStyle = 'rgba(60,40,10,.22)'; ctx.beginPath(); ctx.ellipse(2, 8, 78, 74, 0, 0, TAU); ctx.fill();          // shadow on the grass
+    const g = ctx.createRadialGradient(-20, -26, 10, 0, 0, 80);
+    g.addColorStop(0, '#FFE07A'); g.addColorStop(.7, '#FFC83A'); g.addColorStop(1, '#D98A10');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 77, 0, TAU); ctx.fill();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#B86E14'; ctx.stroke();
+    ctx.rotate(a);
+    for (let i = 0; i < 12; i++) {                         // studs around the edge turn with the plate
+      const b = i * TAU / 12, x = Math.cos(b) * 73.5, y = Math.sin(b) * 73.5;
+      ctx.fillStyle = i % 2 ? '#FFF1B8' : '#C9780E'; ctx.beginPath(); ctx.arc(x, y, i % 2 ? 2.4 : 2, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function spinIcon(r, w) {                                 // a curved arrow going clockwise
+    ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI * .95, Math.PI * .55); ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
+    const ex = Math.cos(Math.PI * .55) * r, ey = Math.sin(Math.PI * .55) * r;
+    ctx.save(); ctx.translate(ex, ey); ctx.rotate(Math.PI * .55 + Math.PI / 2);
+    ctx.beginPath(); ctx.moveTo(w * 1.3, 0); ctx.lineTo(-w * .9, -w * 1.2); ctx.lineTo(-w * .9, w * 1.2); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  function drawSpinBadge(a) {
+    ctx.save(); ctx.translate(48, -50);
+    ctx.fillStyle = 'rgba(10,40,110,.3)'; ctx.beginPath(); ctx.arc(1, 3, 15, 0, TAU); ctx.fill();
+    const g = ctx.createLinearGradient(0, -15, 0, 15); g.addColorStop(0, '#3FA0FF'); g.addColorStop(1, '#1E5FD8');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 15, 0, TAU); ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.rotate(a); ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; spinIcon(7, 2.6);
+    ctx.restore();
+  }
+  // ---------- cloche lid: a silver dome over the plate; open, it sits tilted on the rim ----------
+  function drawCloche(k, alpha = 1) {                      // k: 0 closed .. 1 open
+    const e = k * k * (3 - 2 * k), lift = Math.sin(Math.PI * e) * 26;
+    ctx.save(); ctx.globalAlpha *= alpha;
+    if (e < .98) { ctx.fillStyle = `rgba(30,40,60,${.28 * (1 - e)})`; ctx.beginPath(); ctx.ellipse(FRUIT_C[0] + 4, FRUIT_C[1] + 7, 64, 62, 0, 0, TAU); ctx.fill(); }
+    ctx.translate(FRUIT_C[0] + 46 * e, FRUIT_C[1] - 60 * e - lift); ctx.rotate(.5 * e); const sc = 1 - .6 * e; ctx.scale(sc, sc);
+    const R = 63;
+    const g = ctx.createRadialGradient(-22, -30, 4, -4, -6, R * 1.15);
+    g.addColorStop(0, '#FFFFFF'); g.addColorStop(.28, '#EEF2F6'); g.addColorStop(.72, '#B7C2CE'); g.addColorStop(1, '#7F8D9C');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+    ctx.lineWidth = 5; ctx.strokeStyle = '#7A8796'; ctx.stroke();                         // rim
+    ctx.beginPath(); ctx.arc(0, 0, R - 4.5, 0, TAU); ctx.lineWidth = 1.6; ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R - 6, Math.PI * 1.02, Math.PI * 1.5); ctx.arc(-3, -2, R - 15, Math.PI * 1.5, Math.PI * 1.02, true); ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fill(); ctx.restore();                    // shine along the top-left
+    ctx.fillStyle = 'rgba(90,105,125,.18)'; ctx.beginPath(); ctx.ellipse(14, 18, 34, 26, -.6, 0, TAU); ctx.fill();   // soft shade bottom-right
+    // knob
+    ctx.fillStyle = 'rgba(40,50,70,.3)'; ctx.beginPath(); ctx.ellipse(2, 3, 14, 12, 0, 0, TAU); ctx.fill();
+    const kg = ctx.createRadialGradient(-4, -5, 1, 0, 0, 13); kg.addColorStop(0, '#FFF3B0'); kg.addColorStop(.5, '#FFC83A'); kg.addColorStop(1, '#C97F0C');
+    ctx.fillStyle = kg; ctx.beginPath(); ctx.arc(0, -2, 11.5, 0, TAU); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#A8650A'; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.ellipse(-4, -6, 3.5, 2, -.5, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  // lids go on top of all plates (an open one sits on the rim and may overlap the next plate)
+  function drawLids() {
+    for (const p of S.plates) {
+      if (!p.lid && !p.lidOff) continue;
+      const [ox, oy, rot] = plateOffset(p), s = 1 + p.bounce * .06 + p.pop * .1, dx = p.shake ? Math.sin(p.shake * 40) * 6 * p.shake : 0;
+      ctx.save(); ctx.translate(p.x + ox + dx, p.y + oy); ctx.rotate(rot); ctx.scale(s, s);
+      if (p.lid) drawCloche(clamp01(p.lidK));
+      else {                                                  // knocked off by the hammer: flies away spinning
+        const u = 1 - p.lidOff; ctx.translate(u * 160, -u * 120 + u * u * 260); ctx.rotate(u * 5); drawCloche(clamp01(p.lidK), 1 - u);
+      }
+      ctx.restore();
+    }
   }
   // ice: one thick slab over all frozen slices on a plate (the empty part of the plate stays clear)
   const FRUIT_C = [-.17, -2.72], FRUIT_R = 54.4;
@@ -501,10 +635,24 @@
     rr(69, 582.6 + 2, 265.6, 70.8, 21); ctx.fillStyle = 'rgb(225,188,162)'; ctx.fill();
     rr(69, 582.6, 265.6, 70.8, 21); ctx.fillStyle = '#FAE6D5'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#FEF4E9'; ctx.stroke();
     ctx.font = '900 19px "Goldplay", system-ui, sans-serif';
-    const line = (str, y) => { const ice = str.indexOf('ICE'); tracked(str, 201, y, -.76, (c, x, yy, i) => { ctx.fillStyle = ice >= 0 && i >= ice && i < ice + 3 ? '#F97042' : '#0152F0'; ctx.fillText(c, x, yy); }); };
-    line('Break the ICE by serving a', 609); line('plate next to it!', 628);
+    const O = OBSTACLES[S.introKey] || OBSTACLES.ice, w = O.word;
+    const line = (str, y) => { const at = str.indexOf(w); tracked(str, 201, y, -.76, (c, x, yy, i) => { ctx.fillStyle = at >= 0 && i >= at && i < at + w.length ? '#F97042' : '#0152F0'; ctx.fillText(c, x, yy); }); };
+    line(O.lines[0], 609); line(O.lines[1], 628);
     ctx.restore();
   }
+  // what each obstacle intro says and shows (title, orange word in the banner, the item in the light)
+  const OBSTACLES = {
+    ice: { title: 'Ice', word: 'ICE', lines: ['Break the ICE by serving a', 'plate next to it!'],
+      demo() { const d = [1, 1, 1, 1, 1, 1].map(Boolean); ctx.drawImage(A.plate, -MC[0], -MC[1]); d.forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawIce(d); } },
+    spin: { title: 'Spinning Plate', word: 'SPINS', lines: ['This plate SPINS one slot', 'after every move!'],
+      demo() { const step = 1.3, n = Math.floor(t / step), u = (t % step) / step, a = n * SEG - SEG * (1 - back(clamp01(u / .3)));
+        drawTurntable(a); ctx.drawImage(A.plate, -MC[0], -MC[1]);
+        ctx.save(); ctx.translate(FRUIT_C[0], FRUIT_C[1]); ctx.rotate(a); ctx.translate(-FRUIT_C[0], -FRUIT_C[1]);
+        [1, 1, 1, 0, 1, 0].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); ctx.restore(); drawSpinBadge(a); } },
+    lid: { title: 'Cloche Lid', word: 'LID', lines: ['The LID opens and closes', 'after every move!'],
+      demo() { const c = (t % 2.6) / 2.6, k = c < .35 ? 0 : c < .5 ? (c - .35) / .15 : c < .85 ? 1 : 1 - (c - .85) / .15;
+        ctx.drawImage(A.plate, -MC[0], -MC[1]); [1, 1, 1, 1, 0, 1].forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawCloche(clamp01(k)); } },
+  };
   // drop-in: falls from above with a little bounce and fades in
   const dropIn = (k, start) => { const u = clamp01((k - start) / .45); return { u, dy: -(1 - back(u)) * 70, a: clamp01(u * 2.5) }; };
   function drawObstacleIntro(k) {
@@ -521,8 +669,7 @@
     const pk = back(clamp01((k - .35) * 2.6));
     if (pk > 0) {
       ctx.save(); ctx.translate(201, 427); ctx.scale(pk * 1.11, pk * 1.11);                // Figma 'Ice obstacle'
-      const demo = [1, 1, 1, 1, 1, 1].map(Boolean);
-      ctx.drawImage(A.plate, -MC[0], -MC[1]); demo.forEach((on, j) => { if (on) drawSlice(0, 0, 'm', j); }); drawIce(demo);
+      (OBSTACLES[S.introKey] || OBSTACLES.ice).demo();
       ctx.restore();
       // twinkling sparkles around it
       for (let i = 0; i < 8; i++) {
@@ -532,13 +679,14 @@
     }
     const td = dropIn(k, .05);
     if (td.u > 0) {                                         // "Ice": light outer outline, blue outline, cream gradient
+      const TITLE = (OBSTACLES[S.introKey] || OBSTACLES.ice).title;
       ctx.save(); ctx.globalAlpha = td.a; ctx.translate(201, 172 + td.dy);
       ctx.font = '900 46.67px "Goldplay", system-ui, sans-serif'; ctx.lineJoin = 'round';
       const og = ctx.createLinearGradient(0, -24, 0, 24); og.addColorStop(0, 'rgba(165,193,252,.2)'); og.addColorStop(1, '#EBF0FF');
       const fg = ctx.createLinearGradient(0, -21, 0, 21); fg.addColorStop(0, '#F7F2ED'); fg.addColorStop(1, '#EED2B8');
-      ctx.lineWidth = 11.12; ctx.strokeStyle = og; tracked('Ice', 0, 0, -2.33, (c, x, y) => ctx.strokeText(c, x, y));
-      ctx.lineWidth = 7.08; ctx.strokeStyle = '#088FFD'; tracked('Ice', 0, 0, -2.33, (c, x, y) => ctx.strokeText(c, x, y));
-      ctx.fillStyle = fg; tracked('Ice', 0, 0, -2.33, (c, x, y) => ctx.fillText(c, x, y));
+      ctx.lineWidth = 11.12; ctx.strokeStyle = og; tracked(TITLE, 0, 0, -2.33, (c, x, y) => ctx.strokeText(c, x, y));
+      ctx.lineWidth = 7.08; ctx.strokeStyle = '#088FFD'; tracked(TITLE, 0, 0, -2.33, (c, x, y) => ctx.strokeText(c, x, y));
+      ctx.fillStyle = fg; tracked(TITLE, 0, 0, -2.33, (c, x, y) => ctx.fillText(c, x, y));
       ctx.restore();
     }
     const sd = dropIn(k, .28);
@@ -834,7 +982,7 @@
     }
   }
   function drawHammerFx() {
-    if (armed === 'hammer' && !hammerFx) for (const p of S.plates) if (!p.pop && (p.ice || filled(p))) {      // plates you can hit
+    if (armed === 'hammer' && !hammerFx) for (const p of S.plates) if (!p.pop && (p.ice || filled(p) || p.lid)) {      // plates you can hit
       ctx.beginPath(); ctx.arc(p.x, p.y, PLATE_R + 4 + Math.sin(t * 6) * 2, 0, TAU); ctx.strokeStyle = `rgba(255,236,120,${.55 + Math.sin(t * 6) * .25})`; ctx.lineWidth = 4; ctx.stroke();
     }
     if (!hammerFx) return;
@@ -879,7 +1027,8 @@
     return best;
   }
   function hammerHit(p) {
-    if (p.ice) breakIce(p);
+    if (p.lid) { p.lid = false; p.lidOff = 1; SFX.lid(true); SFX.thud(); }
+    else if (p.ice) breakIce(p);
     else {
       const fruit = p.fruit, n = reduceMotion ? 6 : 16, fx = FX[fruit];
       p.slots.forEach((on, j) => { if (!on) return; const a = -Math.PI / 2 + j * SEG + SEG / 2, v = 150 + Math.random() * 80;
@@ -1048,25 +1197,73 @@
     endEl.hidden = false; $('primary').focus();
   }
   let pendingDrive = false;
-  const endsHere = () => cfg().menuAfter || S.stage === STAGES.length - 1 || S.forceWin;
+  const endsHere = () => !!S.def || cfg().menuAfter || S.stage === STAGES.length - 1 || S.forceWin;
   function endStage(kind) {
     S.phase = 'over'; S.phaseT = 0; S.endKind = kind;
-    if (kind === 'win') { progress = S.level + 1; saveProgress(); pendingDrive = true; }
+    if (kind === 'win' && !S.test) { progress = S.level + 1; saveProgress(); pendingDrive = true; }
     if (kind !== 'win') { S.plates.forEach(q => q.shake = .8); }
   }
   function goMenu() { endEl.hidden = true; scene = 'menu'; fade = 1; if (pendingDrive) { pendingDrive = false; menuDrive(); SFX.busGo(); } }
   function startRun() {
-    resetBoosters(); S = newRun(); S.level = progress; S.obstacleTest = true; setupStage(Math.min(progress, STAGES.length) - 1); note = null;   // testing: obstacle intro on Play badgeNum = 0; badgeSlide = null; badgeKey = '';
+    resetBoosters(); S = newRun(); S.level = progress; setupStage(Math.min(progress, STAGES.length) - 1); note = null;
     particles = []; sparks = []; heartBreak.fill(0); heartFx.fill(0);
     endEl.hidden = true; scene = 'game'; fade = 1; WIN.on = false; FAIL.on = false;
   }
+  // test menu runs: a level by its stage, or a playground; they never change the saved level
+  function startTest(i, def, opts = {}) {
+    resetBoosters(); S = newRun(); S.test = true; S.level = def ? '\u2605' : i + 1; S.autoEnd = opts.autoEnd || null;
+    if (opts.seen) S.seen = { ice: true, spin: true, lid: true };
+    setupStage(i, def); note = null; badgeNum = 0; badgeSlide = null; badgeKey = '';
+    particles = []; sparks = []; heartBreak.fill(0); heartFx.fill(0); flyers = []; fly = null;
+    endEl.hidden = true; scene = 'game'; fade = 1; WIN.on = false; FAIL.on = false;
+  }
   function retryStage() {
-    const i = S.stage; S.lives = START_LIVES; setupStage(i); note = null; armed = null; hammerFx = null;
+    const i = S.stage; S.lives = START_LIVES; setupStage(i, S.def); note = null; armed = null; hammerFx = null;
     particles = []; sparks = []; heartBreak.fill(0); heartFx.fill(0);
     endEl.hidden = true; fade = .6; WIN.on = false; FAIL.on = false; S.failShown = false;
   }
   $('primary').addEventListener('click', () => { audio(); if (endKind === 'win') return goMenu(); SFX.start(); retryStage(); });
   $('secondary').addEventListener('click', goMenu);
+
+  // ---------- test menu: jump to anything ----------
+  const testEl = $('testPanel'), testBody = $('testBody');
+  function buildTest() {
+    const sec = (title, inner) => `<h4>${title}</h4>${inner}`;
+    const btn = (act, label, cls = '') => `<button type="button" class="${cls}" data-act="${act}">${label}</button>`;
+    testBody.innerHTML =
+      sec('Play a level', `<div class="tgrid">${STAGE_NAMES.map((n, i) => btn('lvl:' + i, `${i + 1} · ${n}`)).join('')}</div>`) +
+      sec('Playgrounds', `<div class="tgrid">${btn('pg:ice', 'Ice', 'b')}${btn('pg:spin', 'Spinning plate', 'b')}${btn('pg:lid', 'Cloche lid', 'b')}${btn('pg:all', 'All obstacles', 'b')}</div>`) +
+      sec('Obstacle intros', `<div class="tgrid">${btn('intro:ice', 'Ice', 'o')}${btn('intro:spin', 'Spinning plate', 'o')}${btn('intro:lid', 'Cloche lid', 'o')}</div>`) +
+      sec('Screens', `<div class="tgrid">${btn('win', 'Win screen', 'o')}${btn('fail', 'Fail screen', 'o')}${btn('bus', 'Bus change', 'o')}${btn('menu', 'Main menu', 'b')}</div>`) +
+      sec('Level on the Play button', `<div class="trow">${btn('lv-', '−', 'b')}<b id="testLv">${progress}</b>${btn('lv+', '+', 'b')}${btn('reset', 'Reset to 1', 'r')}</div>`) +
+      sec('Options', `<label><input type="checkbox" id="testAutoBus"${TEST.autoBus ? ' checked' : ''}> Bus drives by itself on the menu</label>
+        <div class="trow" style="margin-top:8px">${btn('boost', 'Refill boosters', 'b')}</div>
+        <p>In a level: tap the level badge to win, tap the goal bar to run out of moves.</p>`);
+  }
+  function openTest() { buildTest(); testEl.hidden = false; $('testClose').focus(); }
+  function closeTest() { testEl.hidden = true; $('testBtn').focus(); }
+  $('testBtn').addEventListener('click', () => { audio(); openTest(); });
+  $('testClose').addEventListener('click', closeTest);
+  testEl.addEventListener('click', e => { if (e.target === testEl) closeTest(); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !testEl.hidden) closeTest(); });
+  testBody.addEventListener('change', e => { if (e.target.id === 'testAutoBus') { TEST.autoBus = e.target.checked; saveTest(); } });
+  testBody.addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]'); if (!b) return;
+    audio(); const [act, arg] = b.dataset.act.split(':');
+    const setLv = n => { progress = Math.max(1, Math.min(99, n)); saveProgress(); MB.shown = progress; MB.scene = sceneFor(progress); $('testLv').textContent = progress; };
+    if (act === 'lv-') return setLv(progress - 1);
+    if (act === 'lv+') return setLv(progress + 1);
+    if (act === 'reset') return setLv(1);
+    if (act === 'boost') { resetBoosters(); showToast('Boosters refilled'); return closeTest(); }
+    closeTest(); SFX.start();
+    if (act === 'lvl') startTest(+arg);
+    else if (act === 'pg') startTest(0, PLAYGROUNDS[arg], { seen: true });
+    else if (act === 'intro') startTest(0, { ...PLAYGROUNDS[arg], obstIntro: arg === 'all' ? null : arg });
+    else if (act === 'win') startTest(5, null, { autoEnd: 'win' });
+    else if (act === 'fail') startTest(5, null, { autoEnd: 'moves' });
+    else if (act === 'menu') { WIN.on = FAIL.on = false; endEl.hidden = true; scene = 'menu'; fade = 1; }
+    else if (act === 'bus') { WIN.on = FAIL.on = false; endEl.hidden = true; scene = 'menu'; fade = 1; if (MB.phase !== 'idle') skipDrive(); menuDrive(); SFX.busGo(); }
+  });
 
   // ---------- input ----------
   function toGame(e) {
@@ -1098,7 +1295,7 @@
     if (S.phase === 'lives') { if (S.phaseT > 1.1) { S.phase = 'play'; S.phaseT = 0; SFX.appear(); spawnPiece(); } return; }
     if (S.phase === 'obstacle') {
       if (S.phaseT > 1.1) {
-        S.iceShown = true; S.phase = 'in'; S.phaseT = 0; SFX.place(); SFX.whoosh(true);      // now the board comes in
+        (S.seen = S.seen || {})[S.introKey] = true; S.phase = 'in'; S.phaseT = 0; SFX.place(); SFX.whoosh(true);      // now the board comes in
       }
       return;
     }
@@ -1108,7 +1305,7 @@
     if (armed === 'hammer') {
       const hp = S.plates.find(q => !q.pop && near(m, q.x, q.y, PLATE_R + 4));
       if (!hp) { armed = null; return; }                         // tap off the plates: put the hammer down
-      if (!hp.ice && !filled(hp)) { hp.shake = 1; SFX.nope(); return showToast('That plate is empty', hp.x, hp.y); }
+      if (!hp.ice && !filled(hp) && !hp.lid) { hp.shake = 1; SFX.nope(); return showToast('That plate is empty', hp.x, hp.y); }
       hammerFx = { p: hp, t: 0, hit: false }; armed = null; boostLeft.hammer--; return;
     }
     if (note && note.hold) { if (note.age < 1.2) return; note = null; }   // after a moment a tap closes the note and still counts
@@ -1118,6 +1315,7 @@
     if (p.ice) {                                            // frozen: not a mistake, just not usable yet
       p.shake = 1; SFX.ice(.4); showToast('Frozen!', p.x, p.y); return;
     }
+    if (p.lid && !p.lidOpen) { p.shake = 1; SFX.lock(); showToast('Closed! It opens next move', p.x, p.y); return; }
     if (S.piece.demoWrong) {                                // lesson: tap the plate where it does not fit
       if (p !== S.plates[S.piece.hint]) return;
       p.shake = 1; S.combo = 0; loseLife();
@@ -1142,7 +1340,18 @@
     p.bounce = 1; S.moves++;
     SFX.place();
     if (filled(p) === 6) { p.pop = .001; S.combo++; } else S.combo = 0;
+    afterMove();
     setTimeout(spawnPiece, 120);
+  }
+  // the board's moving parts react to every placed piece
+  function afterMove() {
+    let spun = false, lids = 0;
+    for (const q of S.plates) {
+      if (q.spin && !q.pop) { q.slots = q.slots.map((_, i) => q.slots[(i + 5) % 6]); q.turns++; q.spinA = 1; spun = true; }
+      if (q.lid) { q.lidOpen = !q.lidOpen; lids++; }
+    }
+    if (spun) SFX.spin();
+    if (lids) setTimeout(() => SFX.lid(S.plates.some(q => q.lid && q.lidOpen)), 60);
   }
   function spawnPiece() {
     if (scene !== 'game' || S.phase !== 'play' || S.piece || fly) return;
@@ -1182,6 +1391,9 @@
       p.bounce = Math.max(0, p.bounce - dt * 5);
       p.shake = Math.max(0, p.shake - dt * 2.5);
       p.iceBreak = Math.max(0, p.iceBreak - dt * 2.8);
+      p.spinA = Math.max(0, p.spinA - dt * 2.6);
+      if (p.lid) p.lidK += ((p.lidOpen ? 1 : 0) - p.lidK) * Math.min(1, dt * 7);
+      p.lidOff = Math.max(0, p.lidOff - dt * 1.6);
       if (p.pop > 0) { p.pop += dt * 14; if (p.pop >= 1) { p.pop = 0; explode(p, p.fruit); p.slots = p.slots.map(() => false); p.fruit = null; } }
     }
     for (const q of particles) {
@@ -1220,13 +1432,16 @@
       S.plates.forEach(p => p.enter = clamp01((S.phaseT - .15 - p.delay) / .55));
       if (S.phaseT > 1.25) {
         if (st.livesIntro && !S.livesShown) { S.livesShown = true; S.phase = 'lives'; S.phaseT = 0; SFX.life(); }
-        else if ((st.iceIntro || S.obstacleTest) && !S.iceShown) { S.phase = 'obstacle'; S.phaseT = 0; SFX.obstacle(); }
+        else if (st.obstIntro && !(S.seen || {})[st.obstIntro]) { S.phase = 'obstacle'; S.introKey = st.obstIntro; S.phaseT = 0; SFX.obstacle(); }
         else { S.phase = 'play'; S.phaseT = 0; spawnPiece(); }
       }
     } else if (S.phase === 'lives') {
       if (S.phaseT > .3 && S.phaseT < 1.2 && Math.floor((S.phaseT - .25) / .09) !== Math.floor((S.phaseT - .25 - dt) / .09)) tone({ f0: 500 + S.phaseT * 400, dur: .08, vol: .06 });
     } else if (S.phase === 'play' && st.livesAfterFirst && !S.livesShown && S.served > 0 && !flyers.length && !fly && !S.plates.some(p => p.pop)) {
       S.livesShown = true; S.phase = 'lives'; S.phaseT = 0; SFX.life();
+    } else if (S.phase === 'play' && S.autoEnd && S.piece && !fly) {      // test menu: jump straight to an end screen
+      const k = S.autoEnd; S.autoEnd = null; S.piece = null;
+      if (k === 'win') { S.phase = 'clear'; S.phaseT = 0; S.forceWin = true; } else endStage('moves');
     } else if (S.phase === 'play') {
       if (fruitsOf(st).every(f => S.left[f] === 0) && !flyers.length && !fly && !S.plates.some(p => p.pop) && !note) {
         S.phase = 'clear'; S.phaseT = 0; S.piece = null; if (!endsHere()) SFX.banner();
@@ -1275,6 +1490,10 @@
   let progress = 1;
   try { if (/[?&]reset\b/.test(location.search)) localStorage.removeItem('mp-level'); progress = Math.max(1, parseInt(localStorage.getItem('mp-level'), 10) || 1); } catch (e) {}
   const saveProgress = () => { try { localStorage.setItem('mp-level', String(progress)); } catch (e) {} };
+  // test menu options (this device only)
+  const TEST = { autoBus: true };
+  try { Object.assign(TEST, JSON.parse(localStorage.getItem('mp-test') || '{}')); } catch (e) {}
+  const saveTest = () => { try { localStorage.setItem('mp-test', JSON.stringify(TEST)); } catch (e) {} };
   // MB: menu bus state. phase idle | drive
   // On a level win the parked bus drives up the bridge, shrinks away near the end with a puff, and at the same time
   // the next bus rolls in from the bottom and parks. Same bus art; the camera never moves.
@@ -1319,7 +1538,7 @@
     updateEnv(dt);
     MB.t += dt; MB.btnPop = Math.max(0, MB.btnPop - dt * 2.5);
     // testing: the preview window can stay loaded when it is closed and reopened, so the bus change also repeats on the menu
-    if (MB.phase === 'idle') { if ((MB.idleT = (MB.idleT || 0) + dt) > 4.5) { MB.idleT = 0; openDrive(); } } else MB.idleT = 0;
+    if (MB.phase === 'idle' && TEST.autoBus) { if ((MB.idleT = (MB.idleT || 0) + dt) > 4.5) { MB.idleT = 0; openDrive(); } } else MB.idleT = 0;
     if (MB.phase === 'drive') {
       MB.mix = Math.min(1, MB.t / (DRIVE.inStart + DRIVE.inDur));
       // near the end of the road the exhaust thickens and billows up over the bus, which shrinks away inside it
@@ -1583,6 +1802,7 @@
     drawLocks();
     if (S.phase !== 'obstacle') ctx.drawImage(A.gen, GEN.x - MC[0], GEN.y - MC[1]);   // hidden until the board comes in
     S.plates.forEach(drawPlate);
+    drawLids();
     drawHammerFx();
 
     if (S.piece) {
@@ -1748,7 +1968,7 @@
     setTimeout(openDrive, 900);
   }
   // testing: the bus change plays every time the game is opened or brought back to the screen
-  function openDrive() { if (scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.busGo(); } }
+  function openDrive() { if (TEST.autoBus && scene === 'menu' && MB.phase === 'idle') { menuDrive(); SFX.busGo(); } }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(openDrive, 600); });
   addEventListener('pageshow', e => { if (e.persisted) setTimeout(openDrive, 600); });
   function setupStageSilent(i) { const st = STAGES[i]; Object.assign(S, { stage: i, plates: makePlates(st), left: { ...st.goals }, combo: 0, script: 0, piece: null, pieceIn: 0, phase: 'in', phaseT: 0 }); }
